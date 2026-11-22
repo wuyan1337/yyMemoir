@@ -57,6 +57,14 @@ export async function periodRecap(kind: PeriodKind, date: string): Promise<Recap
   return kind === 'year' ? DEMO_YEAR : { ...DEMO_DAY, kind }
 }
 
+export interface DayItem { date: string; minutes: number }
+
+/** 有游玩的日子（新的在前） */
+export async function playDays(): Promise<DayItem[]> {
+  if (isTauri()) return invoke<DayItem[]>('play_days', { days: 400 })
+  return DEMO_DAY.daily_minutes.filter((d) => d.minutes > 0).reverse()
+}
+
 export async function appStatus(): Promise<AppStatus | null> {
   if (isTauri()) return invoke<AppStatus>('status')
   return fetch('/real/status.json').then((r) => (r.ok ? r.json() : null)).catch(() => null)

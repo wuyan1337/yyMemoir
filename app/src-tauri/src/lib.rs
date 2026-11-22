@@ -48,6 +48,26 @@ fn session_recap(st: State<AppState>, id: Option<i64>) -> Result<Option<Recap>, 
 }
 
 #[derive(Serialize)]
+struct DayItem {
+    date: String,
+    minutes: i64,
+}
+
+/// 最近 `days` 天里有游玩的日子（新的在前），日报 / 周报 / 月报的列表用
+#[tauri::command]
+fn play_days(st: State<AppState>, days: Option<i64>) -> Result<Vec<DayItem>, String> {
+    let store = open_store(&st)?;
+    let today = chrono::Local::now().date_naive();
+    let from = today - chrono::Duration::days(days.unwrap_or(400));
+    let ms = |d: chrono::NaiveDate| TZ.to_utc_ms(d.and_hms_opt(0, 0, 0).unwrap());
+    let r = yymemoir_core::recap(&store, TZ, "range", ms(from), ms(today + chrono::Duration::days(1)), 1).map_err(|e| e.to_string())?;
+    let mut v: Vec<DayItem> =
+        r.daily_minutes.into_iter().filter(|d| d.minutes > 0).map(|d| DayItem { date: d.date, minutes: d.minutes }).collect();
+    v.reverse();
+    Ok(v)
+}
+
+#[derive(Serialize)]
 struct SessionItem {
     id: i64,
     start: String,
@@ -117,8 +137,8 @@ fn fit_window(app: &tauri::AppHandle) {
     let Ok(Some(m)) = w.current_monitor() else { return };
     let screen = m.size().to_logical::<f64>(m.scale_factor());
     let h = (screen.height * 0.86).clamp(600.0, 1100.0);
-    // 卡片高 ≈ 窗口高 - 顶栏 / 按钮条（约 150），宽 = 高 × 3/4；再加左侧列表和边距（约 300）
-    let wd = ((h - 150.0) * 0.75 + 300.0).clamp(720.0, screen.width * 0.95);
+    // 三栏：导航（约 150）+ 列表（约 260）+ 卡片（高 ≈ 窗口高 - 工具栏和边距约 110，宽 = 高 × 3/4）+ 边距
+    let wd = ((h - 110.0) * 0.75 + 470.0).clamp(820.0, screen.width * 0.95);
     w.set_size(LogicalSize::new(wd, h)).ok();
     w.center().ok();
 }
@@ -128,7 +148,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| notify::show_window(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![BACKGROUND_ARG])))
-        .invoke_handler(tauri::generate_handler![period_recap, session_recap, sessions, status, image_data])
+        .invoke_handler(tauri::generate_handler![period_recap, session_recap, sessions, status, image_data, play_days])
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let paths = Paths::detect(data_dir.clone());

@@ -1,131 +1,266 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LoggingAlert } from './components/LoggingAlert'
 import {
-  appStatus, autostart, isTauri, listSessions, onAppEvent, periodRecap, sessionRecap, shiftDate, today,
-  type AppStatus, type PeriodKind, type SessionItem,
+  appStatus, autostart, isTauri, listSessions, onAppEvent, periodRecap, playDays, sessionRecap, today,
+  type AppStatus, type DayItem, type PeriodKind, type SessionItem,
 } from './lib/data'
-import { exportPng } from './lib/exportPng'
+import { copyPng, exportPng } from './lib/exportPng'
 import type { Privacy } from './lib/format'
-import { RecapCard } from './templates/RecapCard'
+import { useCardTone } from './templates/DailyCard'
+import { RecapCard, defaultStyle, type CardStyle } from './templates/RecapCard'
 import { Canvas } from './templates/parts'
-import { StoryPlayer } from './templates/story/StoryPlayer'
+import { PAGES } from './templates/story/pages'
 import type { Recap } from './types'
 
-/** 桌面端主界面：本次回顾 / 日报 / 周报 / 月报 / 年度报告 / 设置 */
+/** 桌面端主界面，三栏：导航 / 列表 / 卡片（工具栏在卡片上方） */
 type Tab = 'session' | PeriodKind | 'settings'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'session', label: '本次回顾' },
+const NAV: { id: Tab; label: string }[] = [
+  { id: 'session', label: '本次' },
   { id: 'day', label: '日报' },
   { id: 'week', label: '周报' },
   { id: 'month', label: '月报' },
-  { id: 'year', label: '年度报告' },
-  { id: 'settings', label: '设置' },
+  { id: 'year', label: '年度' },
 ]
+const WEEKDAY = '日一二三四五六'
+const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`)
+const pad = (n: number) => String(n).padStart(2, '0')
+const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const dot = (d: string) => `${d.slice(5, 7)}.${d.slice(8, 10)}`
 
-function useFitScale(ref: React.RefObject<HTMLElement | null>, w: number, h: number) {
-  const [s, setS] = useState(0.3)
+/** 卡片按容器大小等比缩放，铺满可用空间 */
+function useFit(ref: React.RefObject<HTMLElement | null>, w: number, h: number) {
+  const [s, setS] = useState(0.4)
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const stage = (el.closest('.stage') as HTMLElement | null) ?? document.body
-    // 可用高度 = 内容区底边 - 卡片顶边 - 下边距(16) - 按钮条(约 56)；内容区大小变了（比如提醒条出现）就重算
-    const fit = () => {
-      const availH = stage.getBoundingClientRect().bottom - el.getBoundingClientRect().top - 16 - 56
-      setS(Math.max(0.15, Math.min(el.clientWidth / w, availH / h, 1)))
-    }
+    const fit = () => setS(Math.max(0.15, Math.min(el.clientWidth / w, el.clientHeight / h)))
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(el)
-    ro.observe(stage)
     return () => ro.disconnect()
   }, [ref, w, h])
   return s
 }
 
-/** 一张卡片 + 保存按钮 */
-function CardView({ r, priv, fileName, label }: { r: Recap | null; priv: Privacy; fileName: string; label: string }) {
-  const boxRef = useRef<HTMLDivElement>(null)
-  const cardRef = useRef<HTMLDivElement>(null)
-  const scale = useFitScale(boxRef, 1080, 1440)
-  const [busy, setBusy] = useState(false)
+function useBusy() {
+  const [busy, setBusy] = useState<string | null>(null)
+  const run = async (label: string, fn: () => Promise<void>) => {
+    setBusy(label)
+    try { await fn(); setBusy(`${label}好了`) } catch { setBusy(`${label}失败`) }
+    setTimeout(() => setBusy(null), 1500)
+  }
+  return { busy, run }
+}
+
+function Toolbar({ title, sub, children }: { title: string; sub?: string; children?: React.ReactNode }) {
   return (
-    <div ref={boxRef} className="card-view">
-      {r && r.total_minutes > 0 ? (
-        <>
-          <Canvas ref={cardRef} w={1080} h={1440} scale={scale}><RecapCard r={r} priv={priv} /></Canvas>
-          <div className="player-bar">
-            <span>{label}</span>
-            <button disabled={busy} onClick={async () => {
-              if (!cardRef.current) return
-              setBusy(true)
-              await exportPng(cardRef.current, fileName)
-              setBusy(false)
-            }}>保存图片</button>
-          </div>
-        </>
-      ) : (
-        <div className="empty">
-          <b>{r ? '这段时间还没有游玩记录' : '还没有游玩记录'}</b>
-          <p>开着 yyMemoir 玩一次 VRChat，下线时就会收到第一份回顾。</p>
-        </div>
-      )}
+    <div className="toolbar">
+      <div className="tb-title"><b>{title}</b>{sub && <span className="mono">{sub}</span>}</div>
+      <div className="tb-actions">{children}</div>
     </div>
   )
 }
 
-function SessionView({ priv, openId, refreshKey }: { priv: Privacy; openId: number | null; refreshKey: number }) {
+const STYLE_LABEL: Record<CardStyle, string> = { receipt: '小票', bento: '格子', ticket: '票根' }
+
+/** 一张报告卡：工具栏（版式 / 复制 / 保存）+ 铺满的卡片 */
+function CardPane({ r, priv, title, sub, fileName }: { r: Recap | null; priv: Privacy; title: string; sub?: string; fileName: string }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const scale = useFit(boxRef, 1080, 1440)
+  const [style, setStyle] = useState<CardStyle | null>(null)
+  const { busy, run } = useBusy()
+  const has = !!r && r.total_minutes > 0
+  const current = style ?? (r ? defaultStyle(r) : 'bento')
+  return (
+    <>
+      <Toolbar title={title} sub={sub}>
+        {has && (
+          <>
+            <div className="seg" role="group" aria-label="版式">
+              {(['receipt', 'bento', 'ticket'] as CardStyle[]).map((s) => (
+                <button key={s} aria-pressed={current === s} onClick={() => setStyle(s)}>{STYLE_LABEL[s]}</button>
+              ))}
+            </div>
+            <button className="btn" disabled={!!busy} onClick={() => run('复制', () => copyPng(cardRef.current!))}>{busy?.startsWith('复制') ? busy : '复制'}</button>
+            <button className="btn primary" disabled={!!busy} onClick={() => run('保存', () => exportPng(cardRef.current!, fileName))}>{busy?.startsWith('保存') ? busy : '保存图片'}</button>
+          </>
+        )}
+      </Toolbar>
+      <div ref={boxRef} className="card-box">
+        {has ? (
+          <Canvas ref={cardRef} w={1080} h={1440} scale={scale}><RecapCard r={r!} priv={priv} style={current} /></Canvas>
+        ) : (
+          <div className="empty">还没有记录</div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* ---------------- 本次 ---------------- */
+function SessionTab({ priv, openId, refreshKey }: { priv: Privacy; openId: number | null; refreshKey: number }) {
   const [list, setList] = useState<SessionItem[]>([])
   const [sel, setSel] = useState<number | null>(null)
   const [r, setR] = useState<Recap | null>(null)
   useEffect(() => { listSessions().then(setList) }, [refreshKey])
   useEffect(() => { if (openId != null) setSel(openId) }, [openId])
-  useEffect(() => { sessionRecap(sel).then(setR) }, [sel, refreshKey])
   const current = sel ?? list[0]?.id ?? null
+  useEffect(() => { sessionRecap(current).then(setR) }, [current, refreshKey])
+  const groups = useMemo(() => {
+    const g: { date: string; items: SessionItem[] }[] = []
+    for (const s of list) {
+      const d = s.start.slice(0, 10)
+      if (g[g.length - 1]?.date !== d) g.push({ date: d, items: [] })
+      g[g.length - 1].items.push(s)
+    }
+    return g
+  }, [list])
+  const cur = list.find((s) => s.id === current)
   return (
-    <div className="split">
-      <aside className="sessions" aria-label="每次游玩">
-        {list.length === 0 && <p className="muted-s">还没有记录</p>}
-        {list.map((s) => (
-          <button key={s.id} className={`session-item ${s.id === current ? 'on' : ''}`} onClick={() => setSel(s.id)}>
-            <b>{s.start.slice(5, 10).replace('-', '.')}</b>
-            <span className="mono">{s.start.slice(11, 16)}–{s.end.slice(11, 16)}</span>
-            <i className="mono">{Math.floor(s.minutes / 60)}h {String(s.minutes % 60).padStart(2, '0')}m</i>
+    <>
+      <aside className="panel">
+        {groups.map((g) => (
+          <section key={g.date}>
+            <h3 className="mono">{dot(g.date)} 周{WEEKDAY[new Date(g.date + 'T00:00:00').getDay()]}</h3>
+            {g.items.map((s) => (
+              <button key={s.id} className={`item ${s.id === current ? 'on' : ''}`} onClick={() => setSel(s.id)}>
+                <span className="mono">{s.start.slice(11, 16)}–{s.end.slice(11, 16)}</span>
+                <i className="mono">{hm(s.minutes)}</i>
+              </button>
+            ))}
+          </section>
+        ))}
+        {list.length === 0 && <p className="panel-empty">还没有记录</p>}
+      </aside>
+      <main className="main">
+        <CardPane r={r} priv={priv} title="本次回顾" sub={cur ? `${dot(cur.start)} ${cur.start.slice(11, 16)}–${cur.end.slice(11, 16)}` : undefined}
+          fileName={`yyMemoir-本次-${(cur?.start ?? '').replace(/[: ]/g, '-')}.png`} />
+      </main>
+    </>
+  )
+}
+
+/* ---------------- 日 / 周 / 月 ---------------- */
+interface PeriodItem { key: string; label: string; sub: string; minutes: number }
+
+function groupDays(days: DayItem[], kind: 'day' | 'week' | 'month'): PeriodItem[] {
+  const m = new Map<string, PeriodItem>()
+  for (const d of days) {
+    const dt = new Date(d.date + 'T00:00:00')
+    let key = d.date, label = dot(d.date), sub = `周${WEEKDAY[dt.getDay()]}`
+    if (kind === 'week') {
+      const mon = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay() + 6) % 7))
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+      key = ymd(mon); label = `${dot(ymd(mon))}–${dot(ymd(sun))}`; sub = `${mon.getFullYear()}`
+    } else if (kind === 'month') {
+      key = `${d.date.slice(0, 7)}-01`; label = `${d.date.slice(0, 4)}.${d.date.slice(5, 7)}`; sub = ''
+    }
+    const it = m.get(key) ?? { key, label, sub, minutes: 0 }
+    it.minutes += d.minutes
+    m.set(key, it)
+  }
+  return [...m.values()]
+}
+
+const KIND_TITLE = { day: '日报', week: '周报', month: '月报' } as const
+
+function PeriodTab({ kind, priv, refreshKey }: { kind: 'day' | 'week' | 'month'; priv: Privacy; refreshKey: number }) {
+  const [days, setDays] = useState<DayItem[]>([])
+  const [sel, setSel] = useState<string | null>(null)
+  const [r, setR] = useState<Recap | null>(null)
+  useEffect(() => { playDays().then(setDays) }, [refreshKey])
+  const items = useMemo(() => groupDays(days, kind), [days, kind])
+  const current = sel ?? items[0]?.key ?? today()
+  useEffect(() => { periodRecap(kind, current).then(setR) }, [kind, current, refreshKey])
+  const max = Math.max(1, ...items.map((i) => i.minutes))
+  const cur = items.find((i) => i.key === current)
+  return (
+    <>
+      <aside className="panel">
+        {items.map((it) => (
+          <button key={it.key} className={`item day ${it.key === current ? 'on' : ''}`} onClick={() => setSel(it.key)}>
+            <span className="mono">{it.label}</span>
+            <small>{it.sub}</small>
+            <i className="mono">{hm(it.minutes)}</i>
+            <em style={{ width: `${(it.minutes / max) * 100}%` }} />
           </button>
         ))}
+        {items.length === 0 && <p className="panel-empty">还没有记录</p>}
       </aside>
-      <CardView r={r} priv={priv} label="本次回顾" fileName={`yyMemoir-本次-${(r?.from ?? '').slice(0, 16).replace(/[: ]/g, '-')}.png`} />
-    </div>
+      <main className="main">
+        <CardPane r={r} priv={priv} title={KIND_TITLE[kind]} sub={cur?.label ?? dot(current)} fileName={`yyMemoir-${KIND_TITLE[kind]}-${current}.png`} />
+      </main>
+    </>
   )
 }
 
-const PERIOD_LABEL: Record<PeriodKind, string> = { day: '日报', week: '周报', month: '月报', year: '年度报告' }
-
-function PeriodView({ kind, priv, refreshKey }: { kind: Exclude<PeriodKind, 'year'>; priv: Privacy; refreshKey: number }) {
-  const [date, setDate] = useState(today())
+/* ---------------- 年度 ---------------- */
+function YearTab({ priv }: { priv: Privacy }) {
   const [r, setR] = useState<Recap | null>(null)
-  useEffect(() => { periodRecap(kind, date).then(setR) }, [kind, date, refreshKey])
-  return (
-    <div className="period">
-      <div className="date-nav">
-        <button onClick={() => setDate(shiftDate(date, kind, -1))} aria-label="上一个">‹</button>
-        <span className="mono">{r ? (kind === 'day' ? r.from.slice(0, 10) : `${r.from.slice(0, 10)} – ${shiftDate(r.to.slice(0, 10), 'day', -1)}`) : date}</span>
-        <button onClick={() => setDate(shiftDate(date, kind, 1))} aria-label="下一个">›</button>
-        <button className="ghost" onClick={() => setDate(today())}>回到现在</button>
-      </div>
-      <CardView r={r} priv={priv} label={PERIOD_LABEL[kind]} fileName={`yyMemoir-${PERIOD_LABEL[kind]}-${date}.png`} />
-    </div>
-  )
-}
-
-function YearView({ priv }: { priv: Privacy }) {
+  const [i, setI] = useState(0)
   const boxRef = useRef<HTMLDivElement>(null)
-  const scale = useFitScale(boxRef, 1080, 1920)
-  const [r, setR] = useState<Recap | null>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const scale = useFit(boxRef, 1080, 1920)
+  const { busy, run } = useBusy()
   useEffect(() => { periodRecap('year', today()).then(setR) }, [])
-  return <div ref={boxRef} className="card-view">{r && <StoryPlayer r={r} priv={priv} scale={scale} />}</div>
+  const tone = useCardTone(r ?? ({ top_worlds: [] } as unknown as Recap))
+  const n = PAGES.length
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') setI((x) => Math.min(n - 1, x + 1))
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') setI((x) => Math.max(0, x - 1))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [n])
+  const year = r?.from.slice(0, 4) ?? ''
+  const saveAll = async () => {
+    for (let k = 0; k < n; k++) {
+      setI(k)
+      await new Promise((res) => setTimeout(res, 350))
+      if (pageRef.current) await exportPng(pageRef.current, `yyMemoir-${year}-${pad(k + 1)}-${PAGES[k].key}.png`)
+    }
+  }
+  return (
+    <>
+      <aside className="panel">
+        <section>
+          {PAGES.map((p, k) => (
+            <button key={p.key} className={`item ${k === i ? 'on' : ''}`} onClick={() => setI(k)}>
+              <span className="mono">{pad(k + 1)}</span><span>{p.title}</span>
+            </button>
+          ))}
+        </section>
+      </aside>
+      <main className="main">
+        <Toolbar title={`${year} 年度`} sub={`${i + 1} / ${n}`}>
+          {r && r.total_minutes > 0 && (
+            <>
+              <div className="seg">
+                <button onClick={() => setI(Math.max(0, i - 1))} aria-label="上一页">‹</button>
+                <button onClick={() => setI(Math.min(n - 1, i + 1))} aria-label="下一页">›</button>
+              </div>
+              <button className="btn" disabled={!!busy} onClick={() => run('复制', () => copyPng(pageRef.current!))}>{busy?.startsWith('复制') ? busy : '复制'}</button>
+              <button className="btn" disabled={!!busy} onClick={() => run('保存全部', saveAll)}>{busy?.startsWith('保存全部') ? busy : '保存全部'}</button>
+              <button className="btn primary" disabled={!!busy} onClick={() => run('保存这页', () => exportPng(pageRef.current!, `yyMemoir-${year}-${pad(i + 1)}-${PAGES[i].key}.png`))}>{busy?.startsWith('保存这页') ? busy : '保存这一页'}</button>
+            </>
+          )}
+        </Toolbar>
+        <div ref={boxRef} className="card-box">
+          {r && r.total_minutes > 0 ? (
+            <Canvas ref={pageRef} w={1080} h={1920} scale={scale} className="story" style={tone}>
+              <div key={PAGES[i].key} className="page-anim">{PAGES[i].render(r, priv)}</div>
+            </Canvas>
+          ) : <div className="empty">还没有记录</div>}
+        </div>
+      </main>
+    </>
+  )
 }
 
-function SettingsView({ priv, setPriv, status }: { priv: Privacy; setPriv: (p: Privacy) => void; status: AppStatus | null }) {
+/* ---------------- 设置 ---------------- */
+function SettingsTab({ priv, setPriv, status }: { priv: Privacy; setPriv: (p: Privacy) => void; status: AppStatus | null }) {
   const [auto, setAuto] = useState<boolean | null>(null)
   useEffect(() => { autostart().then((m) => m?.isEnabled().then(setAuto)) }, [])
   const toggleAuto = async (on: boolean) => {
@@ -135,34 +270,30 @@ function SettingsView({ priv, setPriv, status }: { priv: Privacy; setPriv: (p: P
     setAuto(await m.isEnabled())
   }
   return (
-    <div className="settings">
-      <section>
-        <h2>后台记录</h2>
-        <label className="row">
-          <input id="autostart" type="checkbox" checked={!!auto} disabled={auto === null} onChange={(e) => toggleAuto(e.target.checked)} />
-          <span><b>开机自动启动</b><small>只在托盘里安静记录，下线时推送本次回顾。关掉后需要手动打开 yyMemoir 才会记录。</small></span>
+    <main className="main settings">
+      <Toolbar title="设置" />
+      <div className="settings-body">
+        <label className="row" htmlFor="autostart">
+          <span>开机启动</span>
+          <input id="autostart" type="checkbox" checked={!!auto} disabled={!isTauri() || auto === null} onChange={(e) => toggleAuto(e.target.checked)} />
         </label>
-        {!isTauri() && <p className="muted-s">（浏览器预览里不可用）</p>}
-      </section>
-      <section>
-        <h2>分享隐私</h2>
-        <label className="row">
+        <label className="row" htmlFor="hide-strangers">
+          <span>隐藏非好友名字</span>
           <input id="hide-strangers" type="checkbox" checked={priv.hideStrangers} onChange={(e) => setPriv({ ...priv, hideStrangers: e.target.checked })} />
-          <span><b>隐藏非好友的名字</b><small>登录 VRChat 后才能分辨好友，没登录时会隐藏所有人。</small></span>
         </label>
-        <label className="row">
+        <label className="row" htmlFor="hide-all">
+          <span>隐藏所有名字</span>
           <input id="hide-all" type="checkbox" checked={priv.hideAll} onChange={(e) => setPriv({ ...priv, hideAll: e.target.checked })} />
-          <span><b>隐藏所有人的名字</b><small>导出图片里显示为「一位旅伴」。</small></span>
         </label>
-      </section>
-      <section>
-        <h2>VRChat 日志</h2>
         {status?.log_dir && (
-          <p className="kv"><span>日志文件夹</span><code>{status.log_dir}</code><em className={status.log_dir_found ? 'ok' : 'bad'}>{status.log_dir_found ? '已找到' : '没找到'}</em></p>
+          <div className="row">
+            <span>日志文件夹</span>
+            <code title={status.log_dir}>{status.log_dir}</code>
+            <em className={status.log_dir_found ? 'ok' : 'bad'}>{status.log_dir_found ? '已找到' : '未找到'}</em>
+          </div>
         )}
-        <p className="muted-s">请确认游戏里 设置 → Debug → 日志（Logging）是「完整（Full）」，否则记录不到去过的世界和遇到的人。</p>
-      </section>
-    </div>
+      </div>
+    </main>
   )
 }
 
@@ -178,7 +309,6 @@ export function Shell() {
     appStatus().then(setStatus)
     const offs: Promise<() => void>[] = [
       onAppEvent('session-ended', () => refresh()),
-      // 后台新取到了世界封面等
       onAppEvent('data-updated', () => refresh()),
       onAppEvent('open-session', (id) => { refresh(); setTab('session'); if (id != null) setOpenId(id) }),
     ]
@@ -186,22 +316,19 @@ export function Shell() {
   }, [refresh])
 
   return (
-    <div className="app">
-      <header className="topbar">
+    <div className={`app ${tab === 'settings' ? 'no-panel' : ''}`}>
+      <nav className="rail" aria-label="导航">
         <div className="logo">yyMemoir</div>
-        <nav className="tabs" role="tablist">
-          {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
-          ))}
-        </nav>
-      </header>
+        {NAV.map((t) => (
+          <button key={t.id} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+        <button className="rail-bottom" aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => setTab('settings')}>设置</button>
+      </nav>
       <LoggingAlert status={status} />
-      <main className="stage">
-        {tab === 'session' && <SessionView priv={priv} openId={openId} refreshKey={refreshKey} />}
-        {(tab === 'day' || tab === 'week' || tab === 'month') && <PeriodView key={tab} kind={tab} priv={priv} refreshKey={refreshKey} />}
-        {tab === 'year' && <YearView priv={priv} />}
-        {tab === 'settings' && <SettingsView priv={priv} setPriv={setPriv} status={status} />}
-      </main>
+      {tab === 'session' && <SessionTab priv={priv} openId={openId} refreshKey={refreshKey} />}
+      {(tab === 'day' || tab === 'week' || tab === 'month') && <PeriodTab key={tab} kind={tab} priv={priv} refreshKey={refreshKey} />}
+      {tab === 'year' && <YearTab priv={priv} />}
+      {tab === 'settings' && <SettingsTab priv={priv} setPriv={setPriv} status={status} />}
     </div>
   )
 }

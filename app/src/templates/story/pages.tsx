@@ -6,7 +6,7 @@ import { Bars, Brand, Cover } from '../parts'
 
 /**
  * 年度故事页 1080×1920，一页一个结论。页序参考 PhumudzoSly/github-wrapped (MIT)。
- * 视觉和日报统一：整套色调从全年待得最久的世界封面取色（StoryPlayer 里设置），
+ * 视觉和日报统一：整套色调从全年待得最久的世界封面取色（年度页外层设置），
  * 胶片颗粒、Bricolage 数字、等宽标签、格子（tile）组织信息；最后一页是「年度小票」。
  */
 export interface StoryPage { key: string; title: string; render: (r: Recap, p: Privacy) => ReactNode }
@@ -49,7 +49,7 @@ export const PAGES: StoryPage[] = [
           <div className="yp-intro">
             <div className="yp-year">{year(r)}</div>
             <h1 className="yp-h1">{r.self_name ?? '旅行者'}的<br />VRChat 一年</h1>
-            <p className="yp-lede">从 {cnDate(r.daily_minutes[0]?.date ?? r.from)} 到 {cnDate(r.daily_minutes[r.daily_minutes.length - 1]?.date ?? r.to)}，<br />每一次上线都被悄悄记了下来。</p>
+            <p className="yp-lede">从 {cnDate(r.daily_minutes[0]?.date ?? r.from)} 到 {cnDate(r.daily_minutes[r.daily_minutes.length - 1]?.date ?? r.to)}</p>
           </div>
         </Page>
       )

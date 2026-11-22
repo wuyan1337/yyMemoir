@@ -19,6 +19,14 @@ function Barcode({ seed }: { seed: string }) {
   return <div className="rc-barcode">{bars.map((w, i) => <i key={i} style={{ width: w * 3, marginRight: ((x >> i) & 1) ? 4 : 6 }} />)}</div>
 }
 
+/** 「Neko Mori」或「Neko Mori 等 4 个」：穿得最久的模型在前 */
+export function avatarLine(r: Recap): string | null {
+  const top = r.top_avatars?.[0]
+  if (!top) return null
+  const n = r.avatar_count ?? 1
+  return n > 1 ? `${top.name} 等 ${n} 个` : top.name
+}
+
 export function ReceiptCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const style = useCardTone(r)
   const session = r.kind === 'session'
@@ -33,6 +41,7 @@ export function ReceiptCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const more = all.length - stops.length
   const lastEnd = r.last_logoff ?? r.latest_logoff?.end
   const no = String(hash(r.from + (lastEnd ?? ''))).slice(0, 6)
+  const avatar = avatarLine(r)
 
   return (
     <div className="rc" style={style}>
@@ -67,6 +76,7 @@ export function ReceiptCard({ r, priv }: { r: Recap; priv: Privacy }) {
           <div><span>世界</span><span>{r.world_count}</span></div>
           <div><span>遇见</span><span>{r.people_count} 人</span></div>
           <div><span>照片</span><span>{r.photo_count} 张</span></div>
+          {avatar && <div><span>模型</span><span className="rc-person rc-avatar">{avatar}</span></div>}
         </div>
 
         {people.length > 0 && (

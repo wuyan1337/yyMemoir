@@ -1,3 +1,4 @@
+pub mod avatars;
 pub mod backup;
 pub mod ingest;
 pub mod parse;

@@ -29,6 +29,7 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const people = r.top_people.slice(0, photos.length ? 3 : 4)
   const maxP = Math.max(1, ...people.map((p) => p.minutes))
   const lastEnd = r.last_logoff ?? r.latest_logoff?.end
+  const avatar = r.top_avatars?.[0]
   // 占比最多的房间类型（好友 + 好友+ 合并算「好友房」）
   const kinds: Record<string, number> = {}
   for (const [k, v] of Object.entries(r.access_minutes)) {
@@ -66,7 +67,10 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
         <div className="bt-tile bt-total">
           <span className="bt-label">{periodWord(r.kind)}玩了</span>
           <b>{hm(r.total_minutes)}</b>
-          <span className="bt-sub">{multiDay ? `${r.play_days} 天上线` : lastEnd ? `${clock(lastEnd)} 下线` : ''}</span>
+          <div className="bt-subs">
+            <span className="bt-sub">{multiDay ? `${r.play_days} 天上线` : lastEnd ? `${clock(lastEnd)} 下线` : ''}</span>
+            {avatar && <span className="bt-sub bt-avatar">常穿 {avatar.name}</span>}
+          </div>
         </div>
 
         <div className="bt-tile bt-nums">

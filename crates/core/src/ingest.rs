@@ -2,6 +2,7 @@
 //! 每个文件记住读到的字节位置，只解析新增的完整行；进行中的房间/玩家用 leave_at IS NULL 表示，
 //! 所以监听程序中途重启也能接着记。
 
+use crate::avatars::AvatarTrack;
 use crate::parse::{parse_line, Event};
 use crate::store::Store;
 use chrono::{FixedOffset, Local, NaiveDateTime, TimeZone};
@@ -53,7 +54,8 @@ pub fn ingest_file(store: &mut Store, path: &Path, tz: TimeConv) -> Result<Inges
     let key = path.to_string_lossy().to_string();
     let tx = store.conn.transaction()?;
     tx.execute(
-        "INSERT OR IGNORE INTO log_files(path, first_seen) VALUES (?1, ?2)",
+        // 新文件从头读，模型随正常读取记下，不用再补读
+        "INSERT OR IGNORE INTO log_files(path, first_seen, avatars_scanned) VALUES (?1, ?2, 1)",
         params![key, now_ms()],
     )?;
     let offset: i64 = tx.query_row("SELECT read_offset FROM log_files WHERE path=?1", [&key], |r| r.get(0))?;
@@ -114,6 +116,7 @@ pub fn finalize_file(store: &mut Store, path: &Path) -> Result<()> {
                 params![sid, last],
             )?;
             tx.execute("UPDATE visits SET leave_at=?2 WHERE leave_at IS NULL AND session_id=?1", params![sid, last])?;
+            tx.execute("UPDATE avatar_wears SET end_at=?2 WHERE end_at IS NULL AND session_id=?1", params![sid, last])?;
         }
     }
     tx.execute("UPDATE log_files SET finalized=1 WHERE path=?1", [&key])?;
@@ -132,6 +135,7 @@ struct Tracker {
     self_name: Option<String>,
     pending_name: Option<String>,
     last: Option<i64>,
+    avatars: AvatarTrack,
 }
 
 impl Tracker {
@@ -152,7 +156,8 @@ impl Tracker {
                 .optional()?,
             None => None,
         };
-        Ok(Tracker { key: key.to_string(), session, visit, self_id, self_name, pending_name, last })
+        let avatars = AvatarTrack::load(tx, session)?;
+        Ok(Tracker { key: key.to_string(), session, visit, self_id, self_name, pending_name, last, avatars })
     }
 
     fn save(&self, tx: &Transaction) -> Result<()> {
@@ -276,6 +281,12 @@ impl Tracker {
                 }
             }
             Event::Video { .. } => {}
+            Event::AvatarSwitch { who, avatar } => {
+                if let (Some(s), true) = (self.session, self.self_name.as_deref() == Some(who.as_str())) {
+                    self.avatars.switch(tx, s, t, &avatar)?;
+                }
+            }
+            Event::AvatarData { avatar_id, loading } => self.avatars.data(tx, t, &avatar_id, loading)?,
             Event::Photo { path } => {
                 tx.execute(
                     "INSERT OR IGNORE INTO photos(path, taken_at, visit_id) VALUES (?1, ?2, ?3)",

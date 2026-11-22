@@ -9,7 +9,7 @@ import type { Privacy } from './lib/format'
 import { useCardTone } from './templates/DailyCard'
 import { RecapCard, defaultStyle, type CardStyle } from './templates/RecapCard'
 import { Canvas } from './templates/parts'
-import { PAGES } from './templates/story/pages'
+import { PAGES, pagesFor } from './templates/story/pages'
 import type { Recap } from './types'
 
 /** 桌面端主界面，三栏：导航 / 列表 / 卡片（工具栏在卡片上方） */
@@ -205,7 +205,8 @@ function YearTab({ priv }: { priv: Privacy }) {
   const { busy, run } = useBusy()
   useEffect(() => { periodRecap('year', today()).then(setR) }, [])
   const tone = useCardTone(r ?? ({ top_worlds: [] } as unknown as Recap))
-  const n = PAGES.length
+  const pages = r ? pagesFor(r) : PAGES
+  const n = pages.length
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') setI((x) => Math.min(n - 1, x + 1))
@@ -219,14 +220,14 @@ function YearTab({ priv }: { priv: Privacy }) {
     for (let k = 0; k < n; k++) {
       setI(k)
       await new Promise((res) => setTimeout(res, 350))
-      if (pageRef.current) await exportPng(pageRef.current, `yyMemoir-${year}-${pad(k + 1)}-${PAGES[k].key}.png`)
+      if (pageRef.current) await exportPng(pageRef.current, `yyMemoir-${year}-${pad(k + 1)}-${pages[k].key}.png`)
     }
   }
   return (
     <>
       <aside className="panel">
         <section>
-          {PAGES.map((p, k) => (
+          {pages.map((p, k) => (
             <button key={p.key} className={`item ${k === i ? 'on' : ''}`} onClick={() => setI(k)}>
               <span className="mono">{pad(k + 1)}</span><span>{p.title}</span>
             </button>
@@ -243,14 +244,14 @@ function YearTab({ priv }: { priv: Privacy }) {
               </div>
               <button className="btn" disabled={!!busy} onClick={() => run('复制', () => copyPng(pageRef.current!))}>{busy?.startsWith('复制') ? busy : '复制'}</button>
               <button className="btn" disabled={!!busy} onClick={() => run('保存全部', saveAll)}>{busy?.startsWith('保存全部') ? busy : '保存全部'}</button>
-              <button className="btn primary" disabled={!!busy} onClick={() => run('保存这页', () => exportPng(pageRef.current!, `yyMemoir-${year}-${pad(i + 1)}-${PAGES[i].key}.png`))}>{busy?.startsWith('保存这页') ? busy : '保存这一页'}</button>
+              <button className="btn primary" disabled={!!busy} onClick={() => run('保存这页', () => exportPng(pageRef.current!, `yyMemoir-${year}-${pad(i + 1)}-${pages[i].key}.png`))}>{busy?.startsWith('保存这页') ? busy : '保存这一页'}</button>
             </>
           )}
         </Toolbar>
         <div ref={boxRef} className="card-box">
           {r && r.total_minutes > 0 ? (
             <Canvas ref={pageRef} w={1080} h={1920} scale={scale} className="story" style={tone}>
-              <div key={PAGES[i].key} className="page-anim">{PAGES[i].render(r, priv)}</div>
+              <div key={pages[i].key} className="page-anim">{pages[i].render(r, priv)}</div>
             </Canvas>
           ) : <div className="empty">还没有记录</div>}
         </div>

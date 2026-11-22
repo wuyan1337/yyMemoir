@@ -140,6 +140,9 @@ struct LogFileRow {
     finalized: i64,
     total_lines: i64,
     info_lines: i64,
+    /// v3 加的；旧备份没有这个字段，导入后按「还没补读模型」处理
+    #[serde(default)]
+    avatars_scanned: i64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -148,6 +151,17 @@ struct SessionRow {
     end_at: i64,
     log_file: String,
     visits: Vec<VisitRow>,
+    /// 本人穿的模型；旧备份没有
+    #[serde(default)]
+    avatars: Vec<AvatarRow>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct AvatarRow {
+    avatar_name: String,
+    avatar_id: Option<String>,
+    start_at: i64,
+    end_at: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -281,7 +295,7 @@ fn read_dump(store: &Store) -> rusqlite::Result<Dump> {
     let c = &store.conn;
     let log_files = c
         .prepare(
-            "SELECT path, size, read_offset, first_seen, last_event_at, self_user_id, self_name, finalized, total_lines, info_lines FROM log_files",
+            "SELECT path, size, read_offset, first_seen, last_event_at, self_user_id, self_name, finalized, total_lines, info_lines, avatars_scanned FROM log_files",
         )?
         .query_map([], |r| {
             Ok(LogFileRow {
@@ -295,6 +309,7 @@ fn read_dump(store: &Store) -> rusqlite::Result<Dump> {
                 finalized: r.get(7)?,
                 total_lines: r.get(8)?,
                 info_lines: r.get(9)?,
+                avatars_scanned: r.get(10)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -304,6 +319,8 @@ fn read_dump(store: &Store) -> rusqlite::Result<Dump> {
     let mut visit_st = c.prepare(
         "SELECT id, world_id, instance_id, access_type, world_name, join_at, leave_at FROM visits WHERE session_id = ?1 ORDER BY join_at",
     )?;
+    let mut avatar_st =
+        c.prepare("SELECT avatar_name, avatar_id, start_at, end_at FROM avatar_wears WHERE session_id = ?1 ORDER BY start_at")?;
     let raw_sessions: Vec<(i64, i64, i64, String)> = c
         .prepare("SELECT id, start_at, end_at, log_file FROM sessions ORDER BY start_at")?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
@@ -339,7 +356,10 @@ fn read_dump(store: &Store) -> rusqlite::Result<Dump> {
                 .collect::<rusqlite::Result<_>>()?;
             visits.push(v);
         }
-        sessions.push(SessionRow { start_at, end_at, log_file, visits });
+        let avatars = avatar_st
+            .query_map([sid], |r| Ok(AvatarRow { avatar_name: r.get(0)?, avatar_id: r.get(1)?, start_at: r.get(2)?, end_at: r.get(3)? }))?
+            .collect::<rusqlite::Result<_>>()?;
+        sessions.push(SessionRow { start_at, end_at, log_file, visits, avatars });
     }
     let loose_photos = c
         .prepare("SELECT path, taken_at FROM photos WHERE visit_id IS NULL")?
@@ -477,13 +497,13 @@ pub fn import_from(store: &mut Store, input: impl Read, mode: ImportMode, target
     };
     let tx = store.conn.transaction()?;
     if mode == ImportMode::Replace {
-        tx.execute_batch("DELETE FROM encounters; DELETE FROM photos; DELETE FROM visits; DELETE FROM sessions; DELETE FROM log_files;")?;
+        tx.execute_batch("DELETE FROM encounters; DELETE FROM photos; DELETE FROM visits; DELETE FROM avatar_wears; DELETE FROM sessions; DELETE FROM log_files;")?;
     }
     for f in &dump.log_files {
         tx.execute(
-            "INSERT OR IGNORE INTO log_files(path, size, read_offset, first_seen, last_event_at, self_user_id, self_name, finalized, total_lines, info_lines)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-            params![f.path, f.size, f.read_offset, f.first_seen, f.last_event_at, f.self_user_id, f.self_name, f.finalized, f.total_lines, f.info_lines],
+            "INSERT OR IGNORE INTO log_files(path, size, read_offset, first_seen, last_event_at, self_user_id, self_name, finalized, total_lines, info_lines, avatars_scanned)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            params![f.path, f.size, f.read_offset, f.first_seen, f.last_event_at, f.self_user_id, f.self_name, f.finalized, f.total_lines, f.info_lines, f.avatars_scanned],
         )?;
     }
     let mut rep = ImportReport::default();
@@ -496,6 +516,12 @@ pub fn import_from(store: &mut Store, input: impl Read, mode: ImportMode, target
         }
         tx.execute("INSERT INTO sessions(start_at, end_at, log_file) VALUES (?1,?2,?3)", params![s.start_at, s.end_at, s.log_file])?;
         let sid = tx.last_insert_rowid();
+        for a in &s.avatars {
+            tx.execute(
+                "INSERT INTO avatar_wears(session_id, avatar_name, avatar_id, start_at, end_at) VALUES (?1,?2,?3,?4,?5)",
+                params![sid, a.avatar_name, a.avatar_id, a.start_at, a.end_at],
+            )?;
+        }
         for v in &s.visits {
             tx.execute(
                 "INSERT INTO visits(session_id, world_id, instance_id, access_type, world_name, join_at, leave_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",

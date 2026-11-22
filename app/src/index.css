@@ -208,6 +208,8 @@ em { font-style: normal; color: var(--accent); }
 .bt-hero-cap b { font-size: 40px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
 .bt-hero-cap .mono { font-size: 22px; color: #ffffffd0; }
 .bt-total { grid-area: total; justify-content: space-between; }
+.bt-subs { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bt-avatar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bt-total b { white-space: nowrap; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: -.02em; color: var(--tint-accent); }
 .bt-nums { grid-area: nums; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; align-content: center; }
 .bt-nums div { display: flex; flex-direction: column; }
@@ -327,6 +329,7 @@ em { font-style: normal; color: var(--accent); }
 .yp-person { display: flex; flex-direction: column; gap: 18px; }
 .yp-name { margin: 0; font-family: "Bricolage Grotesque", "PingFang SC", "Microsoft YaHei", sans-serif; font-weight: 800; font-size: 150px; line-height: 1; letter-spacing: -.02em; word-break: break-all; }
 .yp-plist { gap: 26px; }
+.yp-avatar-name { font-size: 110px; }
 .yp-prow > div:first-child { display: flex; align-items: baseline; gap: 20px; font-size: 38px; }
 .yp-prow > div:first-child span { color: var(--tint-ink-3); font-size: 26px; width: 28px; }
 .yp-prow > div:first-child b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -351,6 +354,7 @@ em { font-style: normal; color: var(--accent); }
 .yp-receipt .rc-brand { font-size: 64px; }
 .yp-receipt .rc-meta { font-size: 24px; }
 .yp-receipt .rc-cols, .yp-receipt .rc-sub { font-size: 22px; }
+.rc-avatar { min-width: 0; text-align: right; }
 .yp-receipt .rc-rows { font-size: 30px; gap: 10px; }
 .yp-receipt .rc-total { font-size: 36px; }
 .yp-receipt .rc-total b { font-size: 76px; }

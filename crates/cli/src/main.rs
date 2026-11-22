@@ -47,6 +47,10 @@ fn main() {
         "scan" => {
             let db = arg(&args, "--db").expect("--db");
             let mut store = Store::open(&db).expect("open db");
+            let n = yymemoir_core::avatars::backfill(&mut store, tz).expect("backfill avatars");
+            if n > 0 {
+                eprintln!("模型记录：补读到 {n} 段");
+            }
             if let Some(logs) = arg(&args, "--logs") {
                 let files = log_files(Path::new(&logs));
                 let live = args.iter().any(|a| a == "--live");

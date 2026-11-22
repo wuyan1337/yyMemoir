@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS log_files (
     pending_world_name TEXT,
     finalized     INTEGER NOT NULL DEFAULT 0,
     total_lines   INTEGER NOT NULL DEFAULT 0,
-    info_lines    INTEGER NOT NULL DEFAULT 0
+    info_lines    INTEGER NOT NULL DEFAULT 0,
+    -- 模型记录是 v3 加的：0 = 这个文件还没补读过模型（老数据），见 avatars::backfill
+    avatars_scanned INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS sessions (
     id       INTEGER PRIMARY KEY,
@@ -50,6 +52,15 @@ CREATE TABLE IF NOT EXISTS photos (
     taken_at INTEGER NOT NULL,
     visit_id INTEGER REFERENCES visits(id)
 );
+-- 本人穿的模型：一段 = 从换上到换下（或这次游玩结束）。同名连续出现的合并成一段
+CREATE TABLE IF NOT EXISTS avatar_wears (
+    id          INTEGER PRIMARY KEY,
+    session_id  INTEGER NOT NULL REFERENCES sessions(id),
+    avatar_name TEXT NOT NULL,
+    avatar_id   TEXT,
+    start_at    INTEGER NOT NULL,
+    end_at      INTEGER
+);
 CREATE TABLE IF NOT EXISTS worlds_cache (
     world_id       TEXT PRIMARY KEY,
     name           TEXT,
@@ -69,6 +80,7 @@ CREATE INDEX IF NOT EXISTS idx_visits_session ON visits(session_id, leave_at);
 CREATE INDEX IF NOT EXISTS idx_enc_user ON encounters(user_id);
 CREATE INDEX IF NOT EXISTS idx_enc_visit ON encounters(visit_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_photos_taken ON photos(taken_at);
+CREATE INDEX IF NOT EXISTS idx_avatar_session ON avatar_wears(session_id, end_at);
 "#;
 
 impl Store {
@@ -100,7 +112,7 @@ fn migrate(conn: &Connection) -> Result<()> {
         repair_self(conn)?;
         conn.execute_batch("PRAGMA user_version = 2;")?;
     }
-    for col in ["total_lines", "info_lines"] {
+    for col in ["total_lines", "info_lines", "avatars_scanned"] {
         let has: bool = conn
             .prepare("SELECT 1 FROM pragma_table_info('log_files') WHERE name = ?1")?
             .exists([col])?;

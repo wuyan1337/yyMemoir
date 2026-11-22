@@ -5,7 +5,7 @@ import type { Privacy } from './lib/format'
 import { RecapCard, type CardStyle } from './templates/RecapCard'
 import { useCardTone } from './templates/DailyCard'
 import { Shell } from './Shell'
-import { PAGES } from './templates/story/pages'
+import { pagesFor } from './templates/story/pages'
 import type { Recap } from './types'
 
 // 演示数据（虚构）：浏览器里预览界面时用
@@ -46,7 +46,7 @@ function YearShot({ page, priv }: { page: number; priv: Privacy }) {
   if (!r) return null
   return (
     <div id="shot" className="canvas story" style={{ ...tone, width: 1080, height: 1920 }}>
-      {PAGES[page].render(r, priv)}
+      {pagesFor(r)[page]?.render(r, priv)}
     </div>
   )
 }

@@ -40,6 +40,20 @@ pub struct Recap {
     pub photos: Vec<PhotoStat>,
     /// 按时间顺序的行程（连续待在同一个世界的合并成一段），最多 40 段
     pub timeline: Vec<Stop>,
+    /// 本人穿过的模型数（穿满 1 分钟才算，进房间时一闪而过的默认模型不算）
+    pub avatar_count: usize,
+    /// 穿得最久的模型
+    pub top_avatars: Vec<AvatarStat>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct AvatarStat {
+    pub name: String,
+    /// 模型 ID（有的话）；现在只记录，以后登录后用来取预览图
+    pub avatar_id: Option<String>,
+    pub minutes: i64,
+    /// 换上过几次
+    pub wears: usize,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -340,6 +354,41 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
     tw.sort_by(|a, b| b.minutes.cmp(&a.minutes).then(a.name.cmp(&b.name)));
     tw.truncate(top_n);
     r.top_worlds = tw;
+
+    // ---- 模型：按名字合并（同一个模型有的段没认出 ID）
+    {
+        let mut st = c.prepare(
+            "SELECT a.avatar_name, a.avatar_id, a.start_at, COALESCE(a.end_at, s.end_at)
+             FROM avatar_wears a JOIN sessions s ON s.id = a.session_id
+             WHERE COALESCE(a.end_at, s.end_at) > ?1 AND a.start_at < ?2",
+        )?;
+        let rows = st.query_map(params![from_ms, to_ms], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?, row.get::<_, i64>(2)?, row.get::<_, i64>(3)?))
+        })?;
+        let mut acc: HashMap<String, AvatarStat> = HashMap::new();
+        for row in rows {
+            let (name, id, a, b) = row?;
+            let ms = b.min(to_ms) - a.max(from_ms);
+            let e = acc.entry(name.clone()).or_insert_with(|| AvatarStat { name, avatar_id: None, minutes: 0, wears: 0 });
+            e.minutes += ms.max(0);
+            e.wears += 1;
+            if e.avatar_id.is_none() {
+                e.avatar_id = id;
+            }
+        }
+        let mut av: Vec<AvatarStat> = acc
+            .into_values()
+            .map(|mut a| {
+                a.minutes /= MIN;
+                a
+            })
+            .filter(|a| a.minutes >= 1)
+            .collect();
+        av.sort_by(|a, b| b.minutes.cmp(&a.minutes).then(a.name.cmp(&b.name)));
+        r.avatar_count = av.len();
+        av.truncate(top_n);
+        r.top_avatars = av;
+    }
 
     // ---- 行程
     let mut sorted: Vec<&Visit> = visits.iter().filter(|v| v.b > v.a).collect();

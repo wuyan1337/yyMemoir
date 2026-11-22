@@ -131,6 +131,12 @@ pub fn run(paths: Paths, notify: impl Fn(Outcome) + Send + 'static, updated: imp
     log(format!("启动：日志目录 {}（{}）", paths.vrchat_logs.display(), if paths.vrchat_logs.is_dir() { "找到" } else { "没找到" }));
     let mut sys = System::new();
     let mut was_running = vrchat_running(&mut sys);
+    // 升级前入库的日志没记模型：日志还在的补读一次（只读一次，之后很快）
+    match yymemoir_core::avatars::backfill(&mut store, TZ) {
+        Ok(n) if n > 0 => log(format!("模型记录：补读到 {n} 段")),
+        Ok(_) => {}
+        Err(e) => log(format!("模型记录：补读出错 {e}")),
+    }
     // 开机补扫：游戏没在跑就把所有日志收尾
     sync(&mut store, &paths, was_running);
     // 补扫进来的历史游玩也要有封面

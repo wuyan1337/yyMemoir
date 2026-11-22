@@ -9,10 +9,16 @@ import { Bars, Brand, Cover } from '../parts'
  * 视觉和日报统一：整套色调从全年待得最久的世界封面取色（年度页外层设置），
  * 胶片颗粒、Bricolage 数字、等宽标签、格子（tile）组织信息；最后一页是「年度小票」。
  */
-export interface StoryPage { key: string; title: string; render: (r: Recap, p: Privacy) => ReactNode }
+export interface StoryPage { key: string; title: string; render: (r: Recap, p: Privacy) => ReactNode; /** 没有这类数据时整页不出现 */ when?: (r: Recap) => boolean }
+
+/** 这份年报实际要放的页（比如没记到模型就没有「这一年的你」） */
+export const pagesFor = (r: Recap) => PAGES.filter((p) => !p.when || p.when(r))
 
 const year = (r: Recap) => r.from.slice(0, 4)
 const hours = (m: number) => Math.round(m / 60)
+/** 「65 分钟」「1 小时 5 分」「42 个小时」：时间短时不四舍五入成整小时 */
+const longTime = (m: number): ReactNode =>
+  m < 60 ? <><em>{m}</em> 分钟</> : m < 600 ? <><em>{Math.floor(m / 60)}</em> 小时 <em>{m % 60}</em> 分</> : <><em>{hours(m)}</em> 个小时</>
 const ACCESS: Record<string, { label: string; color: string }> = {
   friends: { label: '好友房', color: '#3987e5' },
   'friends+': { label: '好友+', color: '#d95926' },
@@ -122,6 +128,34 @@ export const PAGES: StoryPage[] = [
               </div>
             ))}
           </div>
+        </Page>
+      )
+    },
+  },
+  {
+    key: 'avatars', title: '这一年的你',
+    when: (r) => (r.top_avatars?.length ?? 0) > 0,
+    render: (r) => {
+      const [first, ...rest] = r.top_avatars ?? []
+      const max = first.minutes || 1
+      return (
+        <Page r={r} label="这一年的你">
+          <div className="yp-person">
+            <span className="yp-label mono">穿得最久的模型</span>
+            <h1 className="yp-name yp-avatar-name">{first.name}</h1>
+            <p className="yp-lede">穿着它度过了 {longTime(first.minutes)}{first.wears > 1 ? `，换上过 ${first.wears} 次` : ''}</p>
+            {(r.avatar_count ?? 0) > 1 && <p className="yp-lede small">这一年你一共换过 {r.avatar_count} 个样子。</p>}
+          </div>
+          {rest.length > 0 && (
+            <div className="yp-tile yp-plist">
+              {rest.slice(0, 4).map((a, i) => (
+                <div key={a.name} className="yp-prow">
+                  <div><span className="mono">{i + 2}</span><b>{a.name}</b><i className="mono">{a.minutes >= 60 ? `${hours(a.minutes)}h` : `${a.minutes}m`}</i></div>
+                  <div className="bt-pbar"><i style={{ width: `${(a.minutes / max) * 100}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          )}
         </Page>
       )
     },
@@ -260,6 +294,7 @@ export const PAGES: StoryPage[] = [
             <div><span>世界</span><span>{r.world_count}</span></div>
             <div><span>遇见</span><span>{r.people_count} 人</span></div>
             <div><span>照片</span><span>{r.photo_count} 张</span></div>
+            {r.top_avatars?.[0] && <div><span>常穿</span><span className="rc-person rc-avatar">{r.top_avatars[0].name}</span></div>}
             {r.latest_logoff && <div><span>最晚下线</span><span>{clock(r.latest_logoff.end)}</span></div>}
           </div>
           <div className="rc-rule double" />

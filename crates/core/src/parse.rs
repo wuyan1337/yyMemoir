@@ -23,6 +23,10 @@ pub enum Event {
     Video { url: String },
     /// `[VRC Camera] Took screenshot to: 路径`：VRChat 相机拍的照片（多层相机模式不会写这行）
     Photo { path: String },
+    /// `Switching 名字 to avatar 模型名`：任何人换模型都会写，入库时只认本人
+    AvatarSwitch { who: String, avatar: String },
+    /// `Loading / Saving Avatar Data:avtr_xxx`：本人模型的参数存取。换模型后 1–2 秒内的 Loading 就是新模型的 ID
+    AvatarData { avatar_id: String, loading: bool },
 }
 
 macro_rules! re {
@@ -45,6 +49,8 @@ re!(left_room_re, r"\[Behaviour\] OnLeftRoom\b");
 re!(video_re, r"\[Video Playback\].*?Attempting to resolve URL '(.+?)'");
 re!(local_re, r#"\[Behaviour\] Initialized PlayerAPI "(.+)" is local\s*$"#);
 re!(photo_re, r"\[VRC Camera\] Took screenshot to: (.+?)\s*$");
+re!(avatar_switch_re, r"\[Behaviour\] Switching (.+?) to avatar (.+?)\s*$");
+re!(avatar_data_re, r"(Loading|Saving) Avatar Data:(avtr_[0-9a-fA-F\-]+)");
 re!(user_suffix_re, r"^(.*?)\s+\((usr_[0-9a-fA-F\-]+)\)$");
 
 /// 解析一行。没有时间戳的行（堆栈、多行续行）返回 None。
@@ -98,6 +104,11 @@ fn parse_event(line: &str) -> Option<Event> {
         if left_room_re().is_match(line) {
             return Some(Event::LeftRoom);
         }
+        if line.contains(" to avatar ") {
+            if let Some(c) = avatar_switch_re().captures(line) {
+                return Some(Event::AvatarSwitch { who: c[1].to_string(), avatar: c[2].to_string() });
+            }
+        }
         return None;
     }
     if let Some(c) = post_login_re().captures(line) {
@@ -111,6 +122,11 @@ fn parse_event(line: &str) -> Option<Event> {
     if line.contains("[VRC Camera]") {
         if let Some(c) = photo_re().captures(line) {
             return Some(Event::Photo { path: c[1].to_string() });
+        }
+    }
+    if line.contains(" Avatar Data:") {
+        if let Some(c) = avatar_data_re().captures(line) {
+            return Some(Event::AvatarData { avatar_id: c[2].to_string(), loading: &c[1] == "Loading" });
         }
     }
     if line.contains("[Video Playback]") {
@@ -157,6 +173,16 @@ mod tests {
         let (_, e) = parse_line("2026.04.30 21:00:01 Log        -  [Behaviour] Entering Room: The Black Cat").unwrap();
         assert_eq!(e, Some(Event::EnteringRoom { world_name: "The Black Cat".into() }));
         assert!(parse_line("   at UnityEngine.Debug.Log").is_none());
+    }
+
+    #[test]
+    fn parses_avatar_lines() {
+        let (_, e) = parse_line("2026.11.23 00:06:51 Debug      -  [Behaviour] Switching y1337 to avatar Cirno Triangre by panquichan").unwrap();
+        assert_eq!(e, Some(Event::AvatarSwitch { who: "y1337".into(), avatar: "Cirno Triangre by panquichan".into() }));
+        let (_, e) = parse_line("2026.11.23 00:06:52 Debug      -  Loading Avatar Data:avtr_5aaf3256-c258-492b-9570-a86f40aa82a8").unwrap();
+        assert_eq!(e, Some(Event::AvatarData { avatar_id: "avtr_5aaf3256-c258-492b-9570-a86f40aa82a8".into(), loading: true }));
+        let (_, e) = parse_line("2026.11.23 00:07:52 Debug      -  Saving Avatar Data:avtr_5aaf3256-c258-492b-9570-a86f40aa82a8").unwrap();
+        assert_eq!(e, Some(Event::AvatarData { avatar_id: "avtr_5aaf3256-c258-492b-9570-a86f40aa82a8".into(), loading: false }));
     }
 
     #[test]

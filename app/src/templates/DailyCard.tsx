@@ -99,11 +99,11 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const session = r.kind === 'session'
   const photos = r.photos.slice(0, 4)
   // 保证不挤：今日卡片有时间轴，少放一站；有照片再少放一站
-  const maxStops = (session ? 5 : 4) - (photos.length ? 1 : 0)
+  // 最多 3 站，只列待得最久的；其余看顶部世界数和时间轴
+  const maxStops = 3
   // 放不下时保留待得最久的几站，再按时间顺序排
   const keep = new Set([...stops].sort((a, b) => b.minutes - a.minutes).slice(0, maxStops))
   const shownStops = stops.filter((s) => keep.has(s))
-  const more = stops.length - shownStops.length
   const lastEnd = r.last_logoff ?? r.latest_logoff?.end
 
   return (
@@ -121,7 +121,7 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
           <div>
             <div className="dc-md">{String(date.getMonth() + 1).padStart(2, '0')}.{String(date.getDate()).padStart(2, '0')}</div>
             <div className="dc-wk mono">
-              {WEEK[date.getDay()]} · {session ? `${clock(r.from)}–${clock(lastEnd ?? r.to)}` : date.getFullYear()}
+              {WEEK[date.getDay()]} · {session ? `${clock(r.from)}–${clock(lastEnd ?? r.to)} · 本次` : `${date.getFullYear()} · 全天`}
             </div>
           </div>
           <div className="dc-total">
@@ -135,13 +135,12 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
         <ol className="dc-stops">
           {shownStops.map((s, i) => (
             <li key={i} className={s.world_id === top?.world_id ? 'hl' : ''}>
-              <span className="dc-time mono">{clock(s.start)}<i>–{clock(s.end)}</i></span>
               <Cover id={s.world_id} url={s.thumbnail} className="dc-thumb" />
               <span className="dc-name">{s.name}</span>
+              <span className="dc-time mono">{clock(s.start)} – {clock(s.end)}</span>
               <span className="dc-dur mono">{hm(s.minutes)}</span>
             </li>
           ))}
-          {more > 0 && <li className="dc-more mono">还去了 {more} 个地方</li>}
         </ol>
 
         {photos.length > 0 && (
@@ -159,7 +158,6 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
         <Line r={r} priv={priv} />
 
         <div className="dc-foot">
-          <span className="dc-kind mono">{session ? '本次回顾' : '今日回顾'}</span>
           <Brand />
         </div>
       </div>

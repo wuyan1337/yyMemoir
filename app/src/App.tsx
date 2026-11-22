@@ -6,6 +6,7 @@ import type { Privacy } from './lib/format'
 import { DailyCard } from './templates/DailyCard'
 import { Canvas } from './templates/parts'
 import { StoryPlayer } from './templates/story/StoryPlayer'
+import { LoggingAlert, useStatus } from './components/LoggingAlert'
 import { PAGES } from './templates/story/pages'
 import type { Recap } from './types'
 
@@ -70,6 +71,7 @@ function Shell() {
   const [priv, setPriv] = useState<Privacy>({ hideStrangers: true, hideAll: false })
   const [busy, setBusy] = useState(false)
   const day = useDay() ?? DEMO_DAY
+  const status = useStatus()
   const stageRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const scale = useFitScale(stageRef, 1080, tab === 'day' ? 1440 : 1920)
@@ -87,6 +89,7 @@ function Shell() {
           <label><input type="checkbox" checked={priv.hideAll} onChange={(e) => setPriv({ ...priv, hideAll: e.target.checked })} /> 隐藏所有人</label>
         </div>
       </header>
+      <LoggingAlert status={status} />
       <main ref={stageRef} className="stage">
         {tab === 'day' ? (
           <div className="player">

@@ -1,6 +1,7 @@
 //! yymemoir-cli：开发/校对用的命令行。
 //!
 //!   yymemoir-cli scan  --db data.db --logs <日志目录> [--photos <截图目录>] [--tz 480] [--live]
+//!   yymemoir-cli status   --db data.db                 # app 用的状态（日志是否「仅错误」）
 //!   yymemoir-cli sessions --db data.db [--tz 480]        # 列出每次游玩
 //!   yymemoir-cli recap --db data.db --kind session --session <id|last>   # 本次报告（下线推送用）
 //!   yymemoir-cli recap --db data.db --kind day|week|month|year|all --date 2026-04-30 [--tz 480] [--top 5]
@@ -122,6 +123,19 @@ fn main() {
             for f in rep.failed {
                 eprintln!("失败 {f}");
             }
+        }
+        "status" => {
+            // app 启动时读的状态：目前只有「仅错误」日志检测
+            let store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");
+            let quiet = yymemoir_core::store::errors_only_logs(&store, 10).expect("check");
+            let latest_quiet = {
+                let last: Option<String> = store
+                    .conn
+                    .query_row("SELECT path FROM log_files ORDER BY path DESC LIMIT 1", [], |r| r.get(0))
+                    .ok();
+                last.is_some_and(|l| quiet.contains(&l))
+            };
+            println!("{}", serde_json::json!({ "errors_only_logs": quiet.len(), "latest_errors_only": latest_quiet }));
         }
         "sessions" => {
             let store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");

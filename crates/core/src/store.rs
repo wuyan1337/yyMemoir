@@ -122,8 +122,8 @@ pub fn errors_only_logs(store: &Store, min_lines: i64) -> Result<Vec<String>> {
 }
 
 /// v2 修复：旧版有时没认出本人，把自己算成了「遇到的人」。
-/// 1. 已知本人名字：同名的记录就是本人，补上 ID 后删掉；
-/// 2. 一个本人都没认出来：出现在 95% 以上房间（至少 5 个）的那个人就是本人。
+/// 只按已知的本人名字修：同名的记录就是本人，补上 ID 后删掉。
+/// 不知道本人是谁时不猜（按「出现次数最多」猜会把整晚一起待在一个房间的朋友误删）。
 fn repair_self(conn: &Connection) -> Result<()> {
     let names: Vec<String> = conn
         .prepare("SELECT DISTINCT self_name FROM log_files WHERE self_name IS NOT NULL")?
@@ -136,24 +136,6 @@ fn repair_self(conn: &Connection) -> Result<()> {
             .query_map([n], |r| r.get(0))?
             .collect::<Result<_>>()?;
         ids.extend(found);
-    }
-    if names.is_empty() {
-        let total: i64 = conn.query_row("SELECT COUNT(*) FROM visits", [], |r| r.get(0))?;
-        if total >= 5 {
-            let top: Option<(String, String, i64)> = conn
-                .query_row(
-                    "SELECT user_id, display_name, COUNT(DISTINCT visit_id) c FROM encounters GROUP BY user_id ORDER BY c DESC LIMIT 1",
-                    [],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-                )
-                .ok();
-            if let Some((uid, name, c)) = top {
-                if c * 100 >= total * 95 {
-                    conn.execute("UPDATE log_files SET self_name = ?1 WHERE self_name IS NULL", [&name])?;
-                    ids.push(uid);
-                }
-            }
-        }
     }
     for id in &ids {
         conn.execute("UPDATE log_files SET self_user_id = ?1 WHERE self_user_id IS NULL", [id])?;

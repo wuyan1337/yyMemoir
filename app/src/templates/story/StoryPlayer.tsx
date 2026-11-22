@@ -4,6 +4,7 @@ import type { Privacy } from '../../lib/format'
 import type { Recap } from '../../types'
 import { Canvas } from '../parts'
 import { PAGES } from './pages'
+import { useCardTone } from '../DailyCard'
 
 /**
  * 快拍式播放器（交互参考 minagishl/github-wrapped 的 WrappedPlayer，MIT）：
@@ -34,6 +35,8 @@ export function StoryPlayer({ r, priv, scale }: { r: Recap; priv: Privacy; scale
   }, [auto, i])
 
   const page = PAGES[i]
+  // 整套年报的色调从全年待得最久的世界封面取
+  const tone = useCardTone(r)
   const exportOne = async () => {
     if (!ref.current) return
     setBusy(true)
@@ -53,7 +56,7 @@ export function StoryPlayer({ r, priv, scale }: { r: Recap; priv: Privacy; scale
   return (
     <div className="player">
       <div className="player-stage">
-        <Canvas ref={ref} w={1080} h={1920} scale={scale} className={`story ${page.theme}`}>
+        <Canvas ref={ref} w={1080} h={1920} scale={scale} className="story" style={tone}>
           <div className="progress no-export">
             {PAGES.map((p, k) => <div key={p.key} className={k < i ? 'done' : k === i ? 'now' : ''} />)}
           </div>

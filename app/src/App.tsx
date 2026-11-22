@@ -3,6 +3,7 @@ import dayJson from './demo/day.json'
 import yearJson from './demo/year.json'
 import type { Privacy } from './lib/format'
 import { RecapCard, type CardStyle } from './templates/RecapCard'
+import { useCardTone } from './templates/DailyCard'
 import { Shell } from './Shell'
 import { PAGES } from './templates/story/pages'
 import type { Recap } from './types'
@@ -31,10 +32,21 @@ function RenderOnly({ q }: { q: URLSearchParams }) {
     const style = (q.get('style') ?? undefined) as CardStyle | undefined
     return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><RecapCard r={day} priv={priv} style={style} /></div>
   }
-  const page = PAGES[Number(q.get('page') ?? 0)]
+  return <YearShot page={Number(q.get('page') ?? 0)} priv={priv} />
+}
+
+function YearShot({ page, priv }: { page: number; priv: Privacy }) {
+  // ?data=xxx.json 时用那份年报数据（真实数据预览用），否则用演示数据
+  const src = new URLSearchParams(location.search).get('data')
+  const [r, setR] = useState<Recap | null>(src ? null : DEMO_YEAR)
+  useEffect(() => {
+    if (src) fetch(src).then((x) => x.json()).then(setR)
+  }, [src])
+  const tone = useCardTone(r ?? DEMO_YEAR)
+  if (!r) return null
   return (
-    <div id="shot" className={`canvas story ${page.theme}`} style={{ width: 1080, height: 1920 }}>
-      {page.render(DEMO_YEAR, priv)}
+    <div id="shot" className="canvas story" style={{ ...tone, width: 1080, height: 1920 }}>
+      {PAGES[page].render(r, priv)}
     </div>
   )
 }

@@ -3,11 +3,11 @@ import { coverStyle, hash, shown, type Privacy } from '../lib/format'
 import type { PersonStat } from '../types'
 
 /** 固定像素尺寸的画布，预览时按容器宽度缩放；导出时用原尺寸 */
-export const Canvas = forwardRef<HTMLDivElement, { w: number; h: number; scale: number; children: ReactNode; className?: string }>(
-  function Canvas({ w, h, scale, children, className }, ref) {
+export const Canvas = forwardRef<HTMLDivElement, { w: number; h: number; scale: number; children: ReactNode; className?: string; style?: React.CSSProperties }>(
+  function Canvas({ w, h, scale, children, className, style }, ref) {
     return (
       <div className="canvas-frame" style={{ width: w * scale, height: h * scale }}>
-        <div ref={ref} className={`canvas ${className ?? ''}`} style={{ width: w, height: h, transform: `scale(${scale})` }}>
+        <div ref={ref} className={`canvas ${className ?? ''}`} style={{ ...style, width: w, height: h, transform: `scale(${scale})` }}>
           {children}
         </div>
       </div>

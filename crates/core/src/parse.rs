@@ -1,6 +1,6 @@
 //! 日志行解析：所有 VRChat 日志格式相关的规则都集中在这个文件里。
 //! 日志格式变了只改这里。规则对照 VRCTimeline (MIT) 的 LogPatterns.cs 与 vrchat-log-rs (MIT)。
-//! TODO: 拿到真实日志后逐条校对（见 进度.md）。
+//! 已用真实日志校对过（2026-11）。
 
 use chrono::NaiveDateTime;
 use regex::Regex;

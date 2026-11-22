@@ -8,7 +8,7 @@ import { Shell } from './Shell'
 import { PAGES } from './templates/story/pages'
 import type { Recap } from './types'
 
-// 演示数据：由 scripts/gen_fake_logs.py 生成假日志 → yymemoir-cli recap 算出来的真实 Recap JSON
+// 演示数据（虚构）：浏览器里预览界面时用
 const DEMO_DAY = dayJson as Recap
 const DEMO_YEAR = yearJson as Recap
 
@@ -23,7 +23,7 @@ function useDay() {
   return day
 }
 
-/** 渲染模式：?render=day 或 ?render=year&page=N，只输出 1:1 画布，给 scripts/render.mjs 截图用 */
+/** 渲染模式：?render=day 或 ?render=year&page=N，只输出 1:1 画布，用于无头浏览器截图 */
 function RenderOnly({ q }: { q: URLSearchParams }) {
   const priv: Privacy = { hideStrangers: q.get('hide') === '1', hideAll: q.get('hideAll') === '1' }
   const day = useDay()

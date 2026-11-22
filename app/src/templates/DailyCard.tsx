@@ -43,7 +43,7 @@ function Line({ r, priv }: { r: Recap; priv: Privacy }) {
   const name = p ? shown(p, priv).name : null
   return (
     <p className="dc-line">
-      {top && <>今天在<b>「{top.name}」</b>待得最久，</>}
+      {top && <>{r.kind === 'session' ? '这次' : '今天'}在<b>「{top.name}」</b>待得最久，</>}
       {name ? <>和 <b>{name}</b> 一起度过了 <em>{cn(p!.minutes)}</em>。</> : <>一个人也逛得很开心。</>}
       {lateNight && <>第二天 <em>{last!.slice(11, 16)}</em> 才说晚安。</>}
     </p>
@@ -96,12 +96,14 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const date = new Date(day + 'T00:00:00')
   const all = r.timeline ?? []
   const stops = itinerary(all)
+  const session = r.kind === 'session'
   const photos = r.photos.slice(0, 4)
-  // 有照片时行程最多 4 站，没有照片时最多 6 站，保证不挤
-  const maxStops = photos.length ? 4 : 6
-  const shownStops = stops.slice(0, maxStops)
+  // 保证不挤：今日卡片有时间轴，少放一站；有照片再少放一站
+  const maxStops = (session ? 5 : 4) - (photos.length ? 1 : 0)
+  // 放不下时保留待得最久的几站，再按时间顺序排
+  const keep = new Set([...stops].sort((a, b) => b.minutes - a.minutes).slice(0, maxStops))
+  const shownStops = stops.filter((s) => keep.has(s))
   const more = stops.length - shownStops.length
-  const people = r.top_people.slice(0, 3)
   const lastEnd = r.last_logoff ?? r.latest_logoff?.end
 
   return (
@@ -118,15 +120,17 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
         <div className="dc-head">
           <div>
             <div className="dc-md">{String(date.getMonth() + 1).padStart(2, '0')}.{String(date.getDate()).padStart(2, '0')}</div>
-            <div className="dc-wk mono">{WEEK[date.getDay()]} · {date.getFullYear()}</div>
+            <div className="dc-wk mono">
+              {WEEK[date.getDay()]} · {session ? `${clock(r.from)}–${clock(lastEnd ?? r.to)}` : date.getFullYear()}
+            </div>
           </div>
           <div className="dc-total">
             <div className="dc-total-n">{hm(r.total_minutes)}</div>
-            <div className="dc-total-l">{r.world_count} 个世界 · {r.people_count} 人{lastEnd ? ` · ${clock(lastEnd)} 下线` : ''}</div>
+            <div className="dc-total-l">{r.world_count} 个世界 · {r.people_count} 人{!session && lastEnd ? ` · ${clock(lastEnd)} 下线` : ''}</div>
           </div>
         </div>
 
-        <DayRibbon stops={all} day={day} longest={top?.world_id} />
+        {!session && <DayRibbon stops={all} day={day} longest={top?.world_id} />}
 
         <ol className="dc-stops">
           {shownStops.map((s, i) => (
@@ -155,11 +159,7 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
         <Line r={r} priv={priv} />
 
         <div className="dc-foot">
-          <div className="dc-names">
-            {people.length > 0
-              ? people.map((p) => <span key={p.user_id}><b>{shown(p, priv).name}</b><i className="mono">{hm(p.minutes)}</i></span>)
-              : <span className="dc-alone">今天是一个人的旅行</span>}
-          </div>
+          <span className="dc-kind mono">{session ? '本次回顾' : '今日回顾'}</span>
           <Brand />
         </div>
       </div>

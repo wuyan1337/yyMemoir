@@ -20,7 +20,8 @@ function useDay() {
   const [day, setDay] = useState<Recap | null>(null)
   useEffect(() => {
     if (new URLSearchParams(location.search).has('demo')) { setDay(DEMO_DAY); return }
-    fetch('/real/day.json').then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => setDay(d ?? DEMO_DAY))
+    const src = new URLSearchParams(location.search).get('data') ?? '/real/day.json'
+    fetch(src).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => setDay(d ?? DEMO_DAY))
   }, [])
   return day
 }

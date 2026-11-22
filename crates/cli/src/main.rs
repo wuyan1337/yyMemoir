@@ -1,6 +1,8 @@
 //! yymemoir-cli：开发/校对用的命令行。
 //!
 //!   yymemoir-cli scan  --db data.db --logs <日志目录> [--photos <截图目录>] [--tz 480] [--live]
+//!   yymemoir-cli sessions --db data.db [--tz 480]        # 列出每次游玩
+//!   yymemoir-cli recap --db data.db --kind session --session <id|last>   # 本次报告（下线推送用）
 //!   yymemoir-cli recap --db data.db --kind day|week|month|year|all --date 2026-04-30 [--tz 480] [--top 5]
 //!   yymemoir-cli fetch-worlds --db data.db --cache <图片目录> [--limit 50]   # 联网取世界名和封面
 //!   yymemoir-cli dump  <日志文件>      # 打印识别出的事件，用来校对真实日志
@@ -67,6 +69,17 @@ fn main() {
                 .map(|d| NaiveDate::parse_from_str(&d, "%Y-%m-%d").expect("--date YYYY-MM-DD"))
                 .unwrap_or_else(|| chrono::Local::now().date_naive());
             let top: usize = arg(&args, "--top").and_then(|s| s.parse().ok()).unwrap_or(5);
+            if kind == "session" {
+                let which = arg(&args, "--session").unwrap_or_else(|| "last".into());
+                let id = if which == "last" {
+                    yymemoir_core::list_sessions(&store, 1).expect("sessions").first().map(|s| s.0).expect("没有有效的游玩")
+                } else {
+                    which.parse().expect("--session <id|last>")
+                };
+                let r = yymemoir_core::recap_session(&store, tz, id, top).expect("recap").expect("这次游玩没进过房间");
+                println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                return;
+            }
             let (a, b) = match kind.as_str() {
                 "day" => (date, date + Duration::days(1)),
                 "week" => {
@@ -101,6 +114,13 @@ fn main() {
             eprintln!("取到 {} 个世界", rep.fetched);
             for f in rep.failed {
                 eprintln!("失败 {f}");
+            }
+        }
+        "sessions" => {
+            let store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");
+            for (id, a, b) in yymemoir_core::list_sessions(&store, 100).expect("sessions") {
+                let f = |ms| tz.to_local(ms).format("%Y-%m-%d %H:%M").to_string();
+                println!("{id}\t{} → {}\t{} 分钟", f(a), f(b), (b - a) / 60_000);
             }
         }
         "dump" => {

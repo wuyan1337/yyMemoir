@@ -49,3 +49,22 @@ fn incremental_ingest_and_recap() {
     assert_eq!(r.peak_hour, Some(21)); // 20 点只有 59 分钟，21 点满 60 分钟
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn session_recap() {
+    let dir = std::env::temp_dir().join(format!("yym-sess-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("output_log_2026-04-30_20-00-00.txt");
+    std::fs::write(&path, include_str!("fixtures_basic.txt")).unwrap();
+    let mut store = Store::open_in_memory().unwrap();
+    ingest_file(&mut store, &path, TZ).unwrap();
+    finalize_file(&mut store, &path).unwrap();
+    let sessions = yymemoir_core::list_sessions(&store, 10).unwrap();
+    assert_eq!(sessions.len(), 1);
+    let r = yymemoir_core::recap_session(&store, TZ, sessions[0].0, 5).unwrap().unwrap();
+    assert_eq!(r.kind, "session");
+    assert_eq!(r.total_minutes, 119);
+    assert_eq!(r.from, "2026-04-30 20:01");
+    assert_eq!(r.last_logoff.as_deref(), Some("2026-04-30 22:00"));
+    std::fs::remove_dir_all(&dir).ok();
+}

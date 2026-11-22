@@ -6,5 +6,5 @@ pub mod store;
 pub mod vrcapi;
 
 pub use ingest::{finalize_file, ingest_file, TimeConv};
-pub use stats::{recap, Recap};
+pub use stats::{list_sessions, recap, recap_session, Recap};
 pub use store::Store;

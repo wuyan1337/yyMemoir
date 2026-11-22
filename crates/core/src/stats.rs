@@ -356,3 +356,34 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
         .collect();
     Ok(r)
 }
+
+/// 一次游玩（一次启动到关闭）的时间范围：从第一次进房间到最后一条日志。没进过房间的启动返回 None。
+pub fn session_range(store: &Store, session_id: i64) -> Result<Option<(i64, i64)>> {
+    store
+        .conn
+        .query_row(
+            "SELECT MIN(v.join_at), s.end_at FROM sessions s JOIN visits v ON v.session_id = s.id WHERE s.id = ?1 GROUP BY s.id",
+            [session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map(Some)
+        .or_else(|e| if e == rusqlite::Error::QueryReturnedNoRows { Ok(None) } else { Err(e) })
+}
+
+/// 有效的游玩（进过房间的），按开始时间倒序：(session_id, 开始, 结束)
+pub fn list_sessions(store: &Store, limit: usize) -> Result<Vec<(i64, i64, i64)>> {
+    let mut st = store.conn.prepare(
+        "SELECT s.id, MIN(v.join_at), s.end_at FROM sessions s JOIN visits v ON v.session_id = s.id
+         GROUP BY s.id ORDER BY MIN(v.join_at) DESC LIMIT ?1",
+    )?;
+    let rows = st.query_map([limit as i64], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+    rows.collect()
+}
+
+/// 本次报告：下线时生成、推送的就是这个。范围 = 这次游玩的 [第一次进房间, 关闭]。
+pub fn recap_session(store: &Store, tz: TimeConv, session_id: i64, top_n: usize) -> Result<Option<Recap>> {
+    match session_range(store, session_id)? {
+        Some((a, b)) => recap(store, tz, "session", a, b + 1, top_n).map(Some),
+        None => Ok(None),
+    }
+}

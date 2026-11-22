@@ -49,7 +49,6 @@ em { font-style: normal; color: var(--accent); }
 .muted { color: var(--ink-3); font-size: 32px; }
 .brand { font-size: 28px; font-weight: 800; color: var(--ink-2); letter-spacing: .04em; }
 .brand-sub { font-weight: 500; color: var(--ink-3); }
-.brand-mark { color: var(--accent); }
 .cover { position: relative; overflow: hidden; }
 .cover-shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, #0009); }
 .cover-text { position: absolute; left: 44px; right: 44px; bottom: 40px; }
@@ -58,22 +57,39 @@ em { font-style: normal; color: var(--accent); }
 .cover-meta { font-size: 32px; color: #ffffffd9; margin-top: 8px; }
 .avatar { border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; box-shadow: 0 0 0 6px #ffffff1f; flex: none; }
 
-/* ---------- 今日卡片 1080×1440 ---------- */
-.daily { position: absolute; inset: 0; padding: 80px 72px 64px; display: flex; flex-direction: column; gap: 44px;
-  background: radial-gradient(1200px 700px at 90% -10%, #4b2f8f 0%, transparent 60%), linear-gradient(180deg, #171236, #0e0b1f); }
-.daily-glow { position: absolute; width: 600px; height: 600px; left: -200px; bottom: -200px; background: radial-gradient(#ffb86b33, transparent 65%); }
-.daily-head h1 { font-size: 78px; line-height: 1.22; margin: 22px 0 0; font-weight: 900; }
-.daily-head .lede { margin-top: 18px; font-size: 36px; }
-.daily-cover { height: 440px; border-radius: 36px; flex: none; }
-.daily-people .people-row { display: flex; gap: 56px; }
-.person { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 220px; }
-.person-name { font-size: 32px; font-weight: 700; text-align: center; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.person-time { font-size: 26px; color: var(--ink-3); }
-.daily-foot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-.daily-photo { display: flex; gap: 24px; align-items: center; }
-.daily-photo .tag { margin: 0 0 6px; font-size: 24px; }
-.photo-thumb { width: 168px; height: 112px; border-radius: 16px; flex: none; }
-.photo-meta { font-size: 28px; color: var(--ink-2); }
+/* ---------- 今日卡片 1080×1440：行程票根 ---------- */
+.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.dc { position: absolute; inset: 0; display: flex; flex-direction: column; color: var(--tint-ink); background: var(--tint-bg); overflow: hidden; }
+/* 胶片颗粒：去掉纯色渐变的「数码感」 */
+.dc-grain { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: .16; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.4 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.dc-hero { position: relative; height: 520px; flex: none; }
+.dc-hero-img { position: absolute; inset: 0; }
+.dc-hero-fade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, var(--tint-bg) 100%); }
+.dc-hero-cap { position: absolute; left: 64px; right: 64px; bottom: 22px; display: flex; align-items: baseline; gap: 18px; font-size: 26px; color: var(--tint-ink-2); }
+.dc-hero-cap b { color: var(--tint-ink); font-size: 30px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-body { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: 26px 64px 52px; }
+.dc-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 30px; border-bottom: 2px dashed var(--tint-line); }
+.dc-md { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 132px; line-height: .9; letter-spacing: -.03em; }
+.dc-wk { margin-top: 14px; font-size: 24px; letter-spacing: .2em; color: var(--tint-ink-3); }
+.dc-total { text-align: right; }
+.dc-total-n { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: 76px; line-height: 1; color: var(--tint-accent); letter-spacing: -.02em; }
+.dc-total-l { margin-top: 14px; font-size: 25px; color: var(--tint-ink-2); }
+.dc-sec { font-size: 21px; letter-spacing: .24em; color: var(--tint-ink-3); margin: 30px 0 14px; }
+.dc-stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.dc-stops li { display: grid; grid-template-columns: 96px 84px minmax(0, 1fr) auto; align-items: center; gap: 22px; padding: 11px 0; border-bottom: 1px solid var(--tint-line); }
+.dc-time { font-size: 26px; color: var(--tint-ink-2); }
+.dc-thumb { width: 84px; height: 56px; border-radius: 8px; }
+.dc-name { font-size: 30px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-dur { font-size: 26px; color: var(--tint-ink-2); }
+.dc-more { display: block !important; font-size: 22px; color: var(--tint-ink-3); border: 0 !important; }
+.dc-foot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+.dc-people { min-width: 0; }
+.dc-names { display: flex; flex-wrap: wrap; gap: 10px 34px; font-size: 30px; }
+.dc-names span { display: inline-flex; align-items: baseline; gap: 12px; }
+.dc-names b { font-weight: 700; }
+.dc-names i { font-style: normal; font-size: 22px; color: var(--tint-ink-3); }
+.dc .brand { color: var(--tint-ink-2); font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: 30px; letter-spacing: 0; flex: none; }
 
 /* ---------- 故事页 1080×1920 ---------- */
 .story { background: #120e2a; }

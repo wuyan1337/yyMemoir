@@ -8,9 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "render": "vite build && node scripts/render.mjs"
+    "render": "vite build && DEMO=1 node scripts/render.mjs"
   },
   "dependencies": {
+    "@fontsource/bricolage-grotesque": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "html-to-image": "^1.11.13",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

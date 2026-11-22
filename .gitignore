@@ -5,3 +5,5 @@ dist/
 demo-data/
 samples/*
 !samples/.gitkeep
+app/public/real/
+preview/r-*/

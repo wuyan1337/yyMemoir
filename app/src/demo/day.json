@@ -4,19 +4,20 @@
   "from": "2026-11-20 00:00",
   "to": "2026-11-21 00:00",
   "self_name": "夜行的猫",
-  "total_minutes": 159,
+  "total_minutes": 158,
   "play_days": 1,
   "session_count": 1,
   "longest_session": {
     "start": "2026-11-20 21:21",
     "end": "2026-11-21 00:39",
-    "minutes": 198
+    "minutes": 197
   },
   "latest_logoff": {
     "start": "2026-11-20 21:21",
     "end": "2026-11-21 00:39",
-    "minutes": 198
+    "minutes": 197
   },
+  "last_logoff": "2026-11-21 00:39",
   "peak_hour": 22,
   "hour_minutes": [
     0,
@@ -40,14 +41,14 @@
     0,
     0,
     0,
-    39,
+    38,
     60,
     60
   ],
   "daily_minutes": [
     {
       "date": "2026-11-20",
-      "minutes": 159
+      "minutes": 158
     }
   ],
   "monthly_minutes": [
@@ -61,12 +62,12 @@
     0,
     0,
     0,
-    159,
+    158,
     0
   ],
   "busiest_day": {
     "date": "2026-11-20",
-    "minutes": 159
+    "minutes": 158
   },
   "world_count": 4,
   "new_world_count": 0,
@@ -200,6 +201,44 @@
       "path": "demo-data/fake-2026/photos/2026-11/VRChat_2026-11-20_23-28-53.426_2560x1440.png",
       "taken_at": "2026-11-20 23:28",
       "world_name": "Cozy Cabin"
+    }
+  ],
+  "timeline": [
+    {
+      "world_id": "wrld_70eb9a0a-9626-3ae6-c5e8-18fac0433cbd",
+      "name": "深海水族馆",
+      "access_type": "friends+",
+      "start": "2026-11-20 21:21",
+      "end": "2026-11-20 22:13",
+      "minutes": 52,
+      "thumbnail": null
+    },
+    {
+      "world_id": "wrld_5b4c8012-ede7-bd0c-ffb8-8309fadb8908",
+      "name": "Cozy Cabin",
+      "access_type": "friends+",
+      "start": "2026-11-20 22:13",
+      "end": "2026-11-20 23:32",
+      "minutes": 78,
+      "thumbnail": null
+    },
+    {
+      "world_id": "wrld_bef7e268-ffe9-76ab-6058-1ccace1d62e0",
+      "name": "Midnight Karaoke",
+      "access_type": "friends+",
+      "start": "2026-11-20 23:32",
+      "end": "2026-11-20 23:54",
+      "minutes": 22,
+      "thumbnail": null
+    },
+    {
+      "world_id": "wrld_f38b2ffc-80a4-df5a-51c9-bc701e7ea419",
+      "name": "午夜天台",
+      "access_type": "public",
+      "start": "2026-11-20 23:55",
+      "end": "2026-11-21 00:00",
+      "minutes": 4,
+      "thumbnail": null
     }
   ]
 }

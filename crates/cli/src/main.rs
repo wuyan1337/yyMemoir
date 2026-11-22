@@ -2,6 +2,7 @@
 //!
 //!   yymemoir-cli scan  --db data.db --logs <日志目录> [--photos <截图目录>] [--tz 480] [--live]
 //!   yymemoir-cli recap --db data.db --kind day|week|month|year|all --date 2026-04-30 [--tz 480] [--top 5]
+//!   yymemoir-cli fetch-worlds --db data.db --cache <图片目录> [--limit 50]   # 联网取世界名和封面
 //!   yymemoir-cli dump  <日志文件>      # 打印识别出的事件，用来校对真实日志
 
 use chrono::{Datelike, Duration, NaiveDate};
@@ -90,6 +91,17 @@ fn main() {
             let ms = |d: NaiveDate| tz.to_utc_ms(d.and_hms_opt(0, 0, 0).unwrap());
             let r = recap(&store, tz, &kind, ms(a), ms(b), top).expect("recap");
             println!("{}", serde_json::to_string_pretty(&r).unwrap());
+        }
+        "fetch-worlds" => {
+            let db = arg(&args, "--db").expect("--db");
+            let cache = arg(&args, "--cache").expect("--cache");
+            let limit: usize = arg(&args, "--limit").and_then(|s| s.parse().ok()).unwrap_or(50);
+            let store = Store::open(&db).expect("open db");
+            let rep = yymemoir_core::vrcapi::fetch_missing_worlds(&store, Path::new(&cache), limit).expect("fetch");
+            eprintln!("取到 {} 个世界", rep.fetched);
+            for f in rep.failed {
+                eprintln!("失败 {f}");
+            }
         }
         "dump" => {
             let p = args.get(2).expect("file");

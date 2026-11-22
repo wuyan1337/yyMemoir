@@ -22,6 +22,8 @@ pub struct Recap {
     pub session_count: usize,
     pub longest_session: Option<SessionStat>,
     pub latest_logoff: Option<SessionStat>,
+    /// 时间段内最后一次下线（真实结束时间，跨零点不截断），今日卡片用
+    pub last_logoff: Option<String>,
     pub peak_hour: Option<u32>,
     pub hour_minutes: Vec<i64>,
     pub daily_minutes: Vec<DayStat>,
@@ -36,6 +38,8 @@ pub struct Recap {
     pub photo_count: usize,
     pub top_photo_world: Option<WorldStat>,
     pub photos: Vec<PhotoStat>,
+    /// 按时间顺序的行程（连续待在同一个世界的合并成一段），最多 40 段
+    pub timeline: Vec<Stop>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -70,6 +74,17 @@ pub struct PersonStat {
     pub avatar: Option<String>,
     /// 一起最久的那一天
     pub best_day: Option<DayStat>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct Stop {
+    pub world_id: String,
+    pub name: String,
+    pub access_type: String,
+    pub start: String,
+    pub end: String,
+    pub minutes: i64,
+    pub thumbnail: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -161,6 +176,9 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
         let stat = SessionStat { start: fmt(tz, s), end: fmt(tz, e), minutes: (e - s) / MIN };
         if r.longest_session.as_ref().map_or(true, |l| stat.minutes > l.minutes) {
             r.longest_session = Some(stat.clone());
+        }
+        if r.last_logoff.as_ref().map_or(true, |x| fmt(tz, e) > *x) {
+            r.last_logoff = Some(fmt(tz, e));
         }
         // 「最晚」：把一天的起点挪到早上 6 点，凌晨 3 点算比晚上 11 点更晚
         let end_local = tz.to_local(e);
@@ -310,5 +328,31 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
     tw.sort_by(|a, b| b.minutes.cmp(&a.minutes).then(a.name.cmp(&b.name)));
     tw.truncate(top_n);
     r.top_worlds = tw;
+
+    // ---- 行程
+    let mut sorted: Vec<&Visit> = visits.iter().filter(|v| v.b > v.a).collect();
+    sorted.sort_by_key(|v| v.a);
+    let mut stops: Vec<(String, String, String, i64, i64)> = Vec::new();
+    for v in sorted {
+        let name = v.world_name.clone().unwrap_or_else(|| v.world_id.clone());
+        match stops.last_mut() {
+            // 同一个世界、中间断开不超过 2 分钟（换房间 / 重连）就合并
+            Some(last) if last.0 == v.world_id && v.a - last.4 <= 2 * MIN => last.4 = last.4.max(v.b),
+            _ => stops.push((v.world_id.clone(), name, v.access.clone(), v.a, v.b)),
+        }
+    }
+    r.timeline = stops
+        .into_iter()
+        .take(40)
+        .map(|(world_id, name, access_type, a, b)| Stop {
+            thumbnail: thumb.query_row([&world_id], |row| row.get(0)).ok().flatten(),
+            world_id,
+            name,
+            access_type,
+            start: fmt(tz, a),
+            end: fmt(tz, b),
+            minutes: (b - a) / MIN,
+        })
+        .collect();
     Ok(r)
 }

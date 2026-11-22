@@ -33,11 +33,7 @@ export function Avatar({ p, priv, size }: { p: PersonStat; priv: Privacy; size: 
 }
 
 export function Brand({ sub }: { sub?: string }) {
-  return (
-    <div className="brand">
-      <span className="brand-mark">◐</span> yyMemoir{sub ? <span className="brand-sub"> · {sub}</span> : null}
-    </div>
-  )
+  return <div className="brand">yyMemoir{sub ? <span className="brand-sub"> · {sub}</span> : null}</div>
 }
 
 /** 单系列竖条图：一个色相，4px 圆角顶端，条间 2px 以上间隔，直接标注峰值 */

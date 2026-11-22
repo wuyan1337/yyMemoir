@@ -15,6 +15,16 @@ const DEMO_YEAR = yearJson as Recap
 
 type Tab = 'day' | 'year'
 
+/** 有真实数据（public/real/day.json，不入库）就用真实的今日数据，否则用演示数据 */
+function useDay() {
+  const [day, setDay] = useState<Recap | null>(null)
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has('demo')) { setDay(DEMO_DAY); return }
+    fetch('/real/day.json').then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => setDay(d ?? DEMO_DAY))
+  }, [])
+  return day
+}
+
 function useFitScale(ref: React.RefObject<HTMLElement | null>, w: number, h: number) {
   const [s, setS] = useState(0.3)
   useEffect(() => {
@@ -35,8 +45,10 @@ function useFitScale(ref: React.RefObject<HTMLElement | null>, w: number, h: num
 /** 渲染模式：?render=day 或 ?render=year&page=N，只输出 1:1 画布，给 scripts/render.mjs 截图用 */
 function RenderOnly({ q }: { q: URLSearchParams }) {
   const priv: Privacy = { hideStrangers: q.get('hide') !== '0', hideAll: q.get('hideAll') === '1' }
+  const day = useDay()
   if (q.get('render') === 'day') {
-    return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><DailyCard r={DEMO_DAY} priv={priv} /></div>
+    if (!day) return null
+    return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><DailyCard r={day} priv={priv} /></div>
   }
   const page = PAGES[Number(q.get('page') ?? 0)]
   return (
@@ -56,6 +68,7 @@ function Shell() {
   const [tab, setTab] = useState<Tab>('year')
   const [priv, setPriv] = useState<Privacy>({ hideStrangers: true, hideAll: false })
   const [busy, setBusy] = useState(false)
+  const day = useDay() ?? DEMO_DAY
   const stageRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const scale = useFitScale(stageRef, 1080, tab === 'day' ? 1440 : 1920)
@@ -63,7 +76,7 @@ function Shell() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="logo"><span className="brand-mark">◐</span> yyMemoir</div>
+        <div className="logo">yyMemoir</div>
         <nav className="tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'day'} onClick={() => setTab('day')}>今日回顾</button>
           <button role="tab" aria-selected={tab === 'year'} onClick={() => setTab('year')}>年度报告</button>
@@ -77,14 +90,14 @@ function Shell() {
         {tab === 'day' ? (
           <div className="player">
             <Canvas ref={cardRef} w={1080} h={1440} scale={scale}>
-              <DailyCard r={DEMO_DAY} priv={priv} />
+              <DailyCard r={day} priv={priv} />
             </Canvas>
             <div className="player-bar">
-              <span>{DEMO_DAY.from.slice(0, 10)} · 今日卡片</span>
+              <span>{day.from.slice(0, 10)} · 今日卡片</span>
               <button disabled={busy} onClick={async () => {
                 if (!cardRef.current) return
                 setBusy(true)
-                await exportPng(cardRef.current, `yyMemoir-${DEMO_DAY.from.slice(0, 10)}.png`)
+                await exportPng(cardRef.current, `yyMemoir-${day.from.slice(0, 10)}.png`)
                 setBusy(false)
               }}>保存图片</button>
             </div>

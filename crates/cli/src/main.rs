@@ -56,6 +56,13 @@ fn main() {
                     eprintln!("{}  +{}B  {} 行  {} 事件", f.display(), rep.bytes_read, rep.lines, rep.events);
                 }
             }
+            let quiet = yymemoir_core::store::errors_only_logs(&store, 10).expect("check");
+            if !quiet.is_empty() {
+                eprintln!("⚠ 有 {} 个日志只记录了报错，没有世界/玩家记录。请在 VRChat 设置 → Debug → 日志 改成「完整（Full）」：", quiet.len());
+                for q in quiet {
+                    eprintln!("   {q}");
+                }
+            }
             if let Some(p) = arg(&args, "--photos") {
                 let n = scan_photos(&mut store, Path::new(&p), tz).expect("photos");
                 eprintln!("新增照片 {n} 张");

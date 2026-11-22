@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS log_files (
     self_user_id  TEXT,
     self_name     TEXT,
     pending_world_name TEXT,
-    finalized     INTEGER NOT NULL DEFAULT 0
+    finalized     INTEGER NOT NULL DEFAULT 0,
+    total_lines   INTEGER NOT NULL DEFAULT 0,
+    info_lines    INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS sessions (
     id       INTEGER PRIMARY KEY,
@@ -76,6 +78,7 @@ impl Store {
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.execute_batch(SCHEMA)?;
+        migrate(&conn)?;
         Ok(Store { conn })
     }
 
@@ -84,4 +87,27 @@ impl Store {
         conn.execute_batch(SCHEMA)?;
         Ok(Store { conn })
     }
+}
+
+/// 老数据库补列
+fn migrate(conn: &Connection) -> Result<()> {
+    for col in ["total_lines", "info_lines"] {
+        let has: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('log_files') WHERE name = ?1")?
+            .exists([col])?;
+        if !has {
+            conn.execute_batch(&format!("ALTER TABLE log_files ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"))?;
+        }
+    }
+    Ok(())
+}
+
+/// 「仅错误」模式的日志：写了至少 `min_lines` 行带时间戳的内容，却没有一条非 Error 的行。
+/// 返回这些文件路径，app 和通知里据此提醒用户把 VRChat 设置 → Debug → 日志 改成「完整」。
+pub fn errors_only_logs(store: &Store, min_lines: i64) -> Result<Vec<String>> {
+    let mut st = store
+        .conn
+        .prepare("SELECT path FROM log_files WHERE info_lines = 0 AND total_lines >= ?1 ORDER BY path")?;
+    let rows = st.query_map([min_lines], |r| r.get(0))?;
+    rows.collect()
 }

@@ -40,6 +40,8 @@ pub struct IngestReport {
     pub bytes_read: u64,
     pub lines: u64,
     pub events: u64,
+    /// 非 Error 级别的行数；为 0 说明游戏日志设成了「仅错误」
+    pub info_lines: u64,
 }
 
 fn now_ms() -> i64 {
@@ -77,6 +79,9 @@ pub fn ingest_file(store: &mut Store, path: &Path, tz: TimeConv) -> Result<Inges
     for line in text.lines() {
         if let Some((ts, ev)) = parse_line(line) {
             rep.lines += 1;
+            if !crate::parse::is_error_line(line) {
+                rep.info_lines += 1;
+            }
             let t = tz.to_utc_ms(ts);
             tracker.touch(&tx, t)?;
             if let Some(ev) = ev {
@@ -87,8 +92,8 @@ pub fn ingest_file(store: &mut Store, path: &Path, tz: TimeConv) -> Result<Inges
     }
     tracker.save(&tx)?;
     tx.execute(
-        "UPDATE log_files SET read_offset=read_offset+?2, size=?3 WHERE path=?1",
-        params![key, complete as i64, size as i64],
+        "UPDATE log_files SET read_offset=read_offset+?2, size=?3, total_lines=total_lines+?4, info_lines=info_lines+?5 WHERE path=?1",
+        params![key, complete as i64, size as i64, rep.lines as i64, rep.info_lines as i64],
     )?;
     tx.commit()?;
     Ok(rep)

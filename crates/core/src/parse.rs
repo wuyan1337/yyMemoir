@@ -42,6 +42,12 @@ re!(video_re, r"\[Video Playback\].*?Attempting to resolve URL '(.+?)'");
 re!(user_suffix_re, r"^(.*?)\s+\((usr_[0-9a-fA-F\-]+)\)$");
 
 /// 解析一行。没有时间戳的行（堆栈、多行续行）返回 None。
+/// 这一行是不是 Error 级别。VRChat 设置 → Debug → 日志 选了「仅错误（Errors Only）」时，
+/// 文件里只会有 Error 行，没有任何世界/玩家记录。
+pub fn is_error_line(line: &str) -> bool {
+    line.get(20..).is_some_and(|rest| rest.starts_with("Error") || rest.starts_with("Exception"))
+}
+
 pub fn parse_line(line: &str) -> Option<(NaiveDateTime, Option<Event>)> {
     let line = line.trim_end_matches(['\r', '\n']);
     let caps = ts_re().captures(line)?;
@@ -145,5 +151,15 @@ mod tests {
         assert_eq!(access_type("1~private(usr_x)~canRequestInvite~region(us)"), "invite+");
         assert_eq!(access_type("1~private(usr_x)"), "invite");
         assert_eq!(access_type("1~group(grp_x)~groupAccessType(public)"), "group");
+    }
+}
+
+#[cfg(test)]
+mod level_tests {
+    #[test]
+    fn error_level() {
+        assert!(super::is_error_line("2026.11.22 02:06:54 Error      -  StyleEngine: Missing resource"));
+        assert!(!super::is_error_line("2026.11.21 01:34:07 Debug      -  Launching with args: 2"));
+        assert!(!super::is_error_line("2026.11.21 01:34:07 Warning    -  OvrLipSync Awake"));
     }
 }

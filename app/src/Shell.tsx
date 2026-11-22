@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LoggingAlert } from './components/LoggingAlert'
 import {
-  appStatus, autostart, isTauri, listSessions, onAppEvent, periodRecap, playDays, sessionRecap, today,
+  appStatus, autostart, exportBackup, importBackup, isTauri, listSessions, onAppEvent, periodRecap, pickBackup, playDays, sessionRecap, today,
   type AppStatus, type DayItem, type PeriodKind, type SessionItem,
 } from './lib/data'
 import { copyPng, exportPng } from './lib/exportPng'
@@ -260,7 +260,56 @@ function YearTab({ priv }: { priv: Privacy }) {
 }
 
 /* ---------------- 设置 ---------------- */
-function SettingsTab({ priv, setPriv, status }: { priv: Privacy; setPriv: (p: Privacy) => void; status: AppStatus | null }) {
+/** 备份：导出 / 导入（合并或覆盖） */
+function BackupRows({ onImported }: { onImported: () => void }) {
+  const [msg, setMsg] = useState<string | null>(null)
+  const [file, setFile] = useState<string | null>(null)
+  const [confirmReplace, setConfirmReplace] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const kb = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
+  const doExport = async () => {
+    setBusy(true)
+    try {
+      const s = await exportBackup()
+      if (s) setMsg(`已导出 ${s.sessions} 次游玩 · ${kb(s.bytes)}`)
+    } catch (e) { setMsg(`导出失败：${e}`) }
+    setBusy(false)
+  }
+  const doImport = async (mode: 'merge' | 'replace') => {
+    if (!file) return
+    setBusy(true)
+    try {
+      const r = await importBackup(file, mode)
+      setMsg(mode === 'merge' ? `已合并：新增 ${r.added} 次，跳过 ${r.skipped} 次（本机已有）` : `已覆盖：共 ${r.added} 次游玩`)
+      setFile(null); setConfirmReplace(false); onImported()
+    } catch (e) { setMsg(`导入失败：${e}`) }
+    setBusy(false)
+  }
+  return (
+    <>
+      <div className="row">
+        <span>备份</span>
+        <button className="btn" disabled={busy || !isTauri()} onClick={doExport}>导出</button>
+        <button className="btn" disabled={busy || !isTauri()} onClick={async () => { setMsg(null); setConfirmReplace(false); setFile(await pickBackup()) }}>导入</button>
+      </div>
+      {file && (
+        <div className="row sub">
+          <code title={file}>{file.split(/[\\/]/).pop()}</code>
+          <button className="btn" disabled={busy} onClick={() => doImport('merge')}>合并</button>
+          {confirmReplace
+            ? <button className="btn danger" disabled={busy} onClick={() => doImport('replace')}>确认覆盖本机记录</button>
+            : <button className="btn" disabled={busy} onClick={() => setConfirmReplace(true)}>覆盖</button>}
+          <button className="btn ghost" disabled={busy} onClick={() => { setFile(null); setConfirmReplace(false) }}>取消</button>
+        </div>
+      )}
+      {file && <p className="row-note">合并：保留本机记录，加入备份里没有的。覆盖：清空本机记录，换成备份。</p>}
+      {msg && <p className="row-note">{msg}</p>}
+    </>
+  )
+}
+
+
+function SettingsTab({ priv, setPriv, status, onImported }: { priv: Privacy; setPriv: (p: Privacy) => void; status: AppStatus | null; onImported: () => void }) {
   const [auto, setAuto] = useState<boolean | null>(null)
   useEffect(() => { autostart().then((m) => m?.isEnabled().then(setAuto)) }, [])
   const toggleAuto = async (on: boolean) => {
@@ -285,6 +334,7 @@ function SettingsTab({ priv, setPriv, status }: { priv: Privacy; setPriv: (p: Pr
           <span>隐藏所有名字</span>
           <input id="hide-all" type="checkbox" checked={priv.hideAll} onChange={(e) => setPriv({ ...priv, hideAll: e.target.checked })} />
         </label>
+        <BackupRows onImported={onImported} />
         {status?.log_dir && (
           <div className="row">
             <span>日志文件夹</span>
@@ -328,7 +378,7 @@ export function Shell() {
       {tab === 'session' && <SessionTab priv={priv} openId={openId} refreshKey={refreshKey} />}
       {(tab === 'day' || tab === 'week' || tab === 'month') && <PeriodTab key={tab} kind={tab} priv={priv} refreshKey={refreshKey} />}
       {tab === 'year' && <YearTab priv={priv} />}
-      {tab === 'settings' && <SettingsTab priv={priv} setPriv={setPriv} status={status} />}
+      {tab === 'settings' && <SettingsTab priv={priv} setPriv={setPriv} status={status} onImported={refresh} />}
     </div>
   )
 }

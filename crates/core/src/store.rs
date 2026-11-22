@@ -91,6 +91,11 @@ impl Store {
 
 /// 老数据库补列
 fn migrate(conn: &Connection) -> Result<()> {
+    let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+    if version < 1 {
+        // v1：照片改为只认日志里「VRC Camera」记录的；旧版按文件夹扫进来的（可能混进别的截图）清掉
+        conn.execute_batch("DELETE FROM photos; PRAGMA user_version = 1;")?;
+    }
     for col in ["total_lines", "info_lines"] {
         let has: bool = conn
             .prepare("SELECT 1 FROM pragma_table_info('log_files') WHERE name = ?1")?

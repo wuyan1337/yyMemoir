@@ -88,16 +88,17 @@ fn sessions(st: State<AppState>, limit: Option<usize>) -> Result<Vec<SessionItem
 
 /// 读本地图片（世界封面 / 截图），缩到最长边 `max` 像素，返回 JPEG data URL。
 /// 不走 asset 协议：同源的 data URL 才能被 canvas 取色、被「保存图片」完整导出。
-/// 只允许读封面缓存和截图文件夹里的文件。
+/// 只允许读封面缓存里的文件，和日志里记录过的 VRChat 照片。
 #[tauri::command]
 fn image_data(st: State<AppState>, path: String, max: Option<u32>) -> Result<String, String> {
     use base64::Engine;
     let p = std::path::Path::new(&path).canonicalize().map_err(|e| e.to_string())?;
-    let allowed = [Some(st.paths.world_cache.clone()), st.paths.screenshots.clone()]
-        .into_iter()
-        .flatten()
-        .filter_map(|d| d.canonicalize().ok())
-        .any(|d| p.starts_with(d));
+    let in_cache = st.paths.world_cache.canonicalize().is_ok_and(|d| p.starts_with(d));
+    let is_photo = open_store(&st)?
+        .conn
+        .query_row("SELECT 1 FROM photos WHERE path = ?1", [&path], |_| Ok(()))
+        .is_ok();
+    let allowed = in_cache || is_photo;
     if !allowed {
         return Err("不允许读取这个位置的文件".into());
     }
@@ -107,6 +108,34 @@ fn image_data(st: State<AppState>, path: String, max: Option<u32>) -> Result<Str
     let mut buf = std::io::Cursor::new(Vec::new());
     img.to_rgb8().write_to(&mut buf, image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
     Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buf.into_inner())))
+}
+
+/// 导出备份到 `path`（.yymb）
+#[tauri::command]
+fn export_backup(st: State<AppState>, path: String) -> Result<yymemoir_core::backup::BackupSummary, String> {
+    let (bytes, sum) = yymemoir_core::backup::export(&open_store(&st)?).map_err(|e| e.to_string())?;
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    log::log(format!("导出备份 {path}（{} 次游玩，{} 字节）", sum.sessions, sum.bytes));
+    Ok(sum)
+}
+
+/// 从 `path` 导入备份；mode = "merge"（合并）或 "replace"（覆盖）。导入后在后台补取封面。
+#[tauri::command]
+fn import_backup(app: tauri::AppHandle, st: State<AppState>, path: String, mode: String) -> Result<yymemoir_core::backup::ImportReport, String> {
+    use yymemoir_core::backup::ImportMode;
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let m = if mode == "replace" { ImportMode::Replace } else { ImportMode::Merge };
+    let mut store = open_store(&st)?;
+    let rep = yymemoir_core::backup::import(&mut store, &bytes, m).map_err(|e| e.to_string())?;
+    log::log(format!("导入备份 {path}（{mode}）：新增 {}，跳过 {}", rep.added, rep.skipped));
+    let paths = st.paths.clone();
+    std::thread::spawn(move || {
+        if let Ok(store) = Store::open(&paths.db) {
+            watcher::fetch_worlds(&store, &paths);
+        }
+        app.emit("data-updated", ()).ok();
+    });
+    Ok(rep)
 }
 
 #[derive(Serialize)]
@@ -147,8 +176,9 @@ fn fit_window(app: &tauri::AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| notify::show_window(app)))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![BACKGROUND_ARG])))
-        .invoke_handler(tauri::generate_handler![period_recap, session_recap, sessions, status, image_data, play_days])
+        .invoke_handler(tauri::generate_handler![period_recap, session_recap, sessions, status, image_data, play_days, export_backup, import_backup])
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let paths = Paths::detect(data_dir.clone());

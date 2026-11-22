@@ -6,6 +6,8 @@
 //!   yymemoir-cli recap --db data.db --kind session --session <id|last>   # 本次报告（下线推送用）
 //!   yymemoir-cli recap --db data.db --kind day|week|month|year|all --date 2026-04-30 [--tz 480] [--top 5]
 //!   yymemoir-cli fetch-worlds --db data.db --cache <图片目录> [--limit 50]   # 联网取世界名和封面
+//!   yymemoir-cli export --db data.db --out backup.yymb          # 备份
+//!   yymemoir-cli import --db data.db --in backup.yymb [--mode merge|replace]
 //!   yymemoir-cli dump  <日志文件>      # 打印识别出的事件，用来校对真实日志
 
 use chrono::{Datelike, Duration, NaiveDate};
@@ -122,6 +124,25 @@ fn main() {
             eprintln!("取到 {} 个世界", rep.fetched);
             for f in rep.failed {
                 eprintln!("失败 {f}");
+            }
+        }
+        "export" => {
+            let store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");
+            let out = arg(&args, "--out").expect("--out");
+            let (bytes, sum) = yymemoir_core::backup::export(&store).expect("export");
+            std::fs::write(&out, &bytes).expect("write");
+            eprintln!("导出 {} 次游玩、{} 个房间、{} 张照片 → {}（{} KB）", sum.sessions, sum.visits, sum.photos, out, bytes.len() / 1024);
+        }
+        "import" => {
+            let mut store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");
+            let bytes = std::fs::read(arg(&args, "--in").expect("--in")).expect("read");
+            let mode = match arg(&args, "--mode").as_deref() {
+                Some("replace") => yymemoir_core::backup::ImportMode::Replace,
+                _ => yymemoir_core::backup::ImportMode::Merge,
+            };
+            match yymemoir_core::backup::import(&mut store, &bytes, mode) {
+                Ok(r) => eprintln!("导入完成：新增 {} 次游玩，跳过 {} 次（本机已有）", r.added, r.skipped),
+                Err(e) => eprintln!("导入失败：{e}"),
             }
         }
         "status" => {

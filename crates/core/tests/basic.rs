@@ -46,7 +46,10 @@ fn incremental_ingest_and_recap() {
     assert_eq!(r.top_people[2].minutes, 19);
     assert_eq!(r.access_minutes.get("friends"), Some(&90));
     assert_eq!(r.access_minutes.get("invite"), Some(&9));
-    assert_eq!(r.peak_hour, Some(21)); // 20 点只有 59 分钟，21 点满 60 分钟
+    assert_eq!(r.peak_hour, Some(21));
+    // 日志里的相机照片记到当时所在的世界
+    assert_eq!(r.photo_count, 1);
+    assert_eq!(r.top_photo_world.as_ref().map(|w| w.name.as_str()), Some("黑猫酒吧")); // 20 点只有 59 分钟，21 点满 60 分钟
     std::fs::remove_dir_all(&dir).ok();
 }
 

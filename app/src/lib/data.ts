@@ -96,3 +96,27 @@ export function shiftDate(date: string, kind: PeriodKind, n: number) {
   if (kind === 'year') d.setFullYear(d.getFullYear() + n, 0, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+export interface BackupSummary { sessions: number; visits: number; photos: number; bytes: number }
+export interface ImportReport { added: number; skipped: number }
+
+/** 选位置并导出备份；取消返回 null */
+export async function exportBackup(): Promise<BackupSummary | null> {
+  if (!isTauri()) return null
+  const { save } = await import('@tauri-apps/plugin-dialog')
+  const path = await save({ defaultPath: `yyMemoir-备份-${today()}.yymb`, filters: [{ name: 'yyMemoir 备份', extensions: ['yymb'] }] })
+  if (!path) return null
+  return invoke<BackupSummary>('export_backup', { path })
+}
+
+/** 选备份文件；取消返回 null */
+export async function pickBackup(): Promise<string | null> {
+  if (!isTauri()) return null
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const path = await open({ multiple: false, filters: [{ name: 'yyMemoir 备份', extensions: ['yymb'] }] })
+  return typeof path === 'string' ? path : null
+}
+
+export async function importBackup(path: string, mode: 'merge' | 'replace'): Promise<ImportReport> {
+  return invoke<ImportReport>('import_backup', { path, mode })
+}

@@ -19,6 +19,8 @@ pub enum Event {
     /// `OnLeftRoom`：离开当前房间
     LeftRoom,
     Video { url: String },
+    /// `[VRC Camera] Took screenshot to: 路径`：VRChat 相机拍的照片（多层相机模式不会写这行）
+    Photo { path: String },
 }
 
 macro_rules! re {
@@ -39,6 +41,7 @@ re!(joined_re, r"\[Behaviour\] OnPlayerJoined (.+?)\s*$");
 re!(left_re, r"\[Behaviour\] OnPlayerLeft (.+?)\s*$");
 re!(left_room_re, r"\[Behaviour\] OnLeftRoom\b");
 re!(video_re, r"\[Video Playback\].*?Attempting to resolve URL '(.+?)'");
+re!(photo_re, r"\[VRC Camera\] Took screenshot to: (.+?)\s*$");
 re!(user_suffix_re, r"^(.*?)\s+\((usr_[0-9a-fA-F\-]+)\)$");
 
 /// 解析一行。没有时间戳的行（堆栈、多行续行）返回 None。
@@ -96,6 +99,11 @@ fn parse_event(line: &str) -> Option<Event> {
     if let Some(c) = auth_re().captures(line) {
         let (name, user_id) = split_user(&c[1]);
         return Some(Event::SelfUser { name, user_id });
+    }
+    if line.contains("[VRC Camera]") {
+        if let Some(c) = photo_re().captures(line) {
+            return Some(Event::Photo { path: c[1].to_string() });
+        }
     }
     if line.contains("[Video Playback]") {
         if let Some(c) = video_re().captures(line) {

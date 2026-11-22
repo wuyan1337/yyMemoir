@@ -1,5 +1,6 @@
 //! 后台监听：每 5 秒看一次 VRChat 是否在运行、增量读日志。
-//! 检测到 VRChat 关闭 → 收尾这次游玩 → 扫截图、取世界封面 → 生成「本次回顾」并推送通知。
+//! 检测到 VRChat 关闭 → 收尾这次游玩 → 取世界封面 → 生成「本次回顾」并推送通知。
+//! 照片只认日志里「VRC Camera」记录的（在读日志时就入库了），不扫截图文件夹。
 
 use crate::log::log;
 use crate::paths::Paths;
@@ -66,9 +67,6 @@ pub fn sync(store: &mut Store, paths: &Paths, running: bool) {
 /// 下线后的收尾工作，返回要推送的内容
 pub fn on_game_exit(store: &mut Store, paths: &Paths) -> Option<Outcome> {
     sync(store, paths, false);
-    if let Some(dir) = &paths.screenshots {
-        yymemoir_core::photos::scan_photos(store, dir, TZ).ok();
-    }
     // 最新一个日志是「仅错误」→ 提醒去改设置
     let latest_quiet = store
         .conn
@@ -135,11 +133,6 @@ pub fn run(paths: Paths, notify: impl Fn(Outcome) + Send + 'static, updated: imp
     let mut was_running = vrchat_running(&mut sys);
     // 开机补扫：游戏没在跑就把所有日志收尾
     sync(&mut store, &paths, was_running);
-    if !was_running {
-        if let Some(dir) = &paths.screenshots {
-            yymemoir_core::photos::scan_photos(&mut store, dir, TZ).ok();
-        }
-    }
     // 补扫进来的历史游玩也要有封面
     if fetch_worlds(&store, &paths) > 0 {
         updated();

@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod ingest;
 pub mod parse;
 pub mod photos;

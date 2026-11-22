@@ -259,6 +259,12 @@ impl Tracker {
                 }
             }
             Event::Video { .. } => {}
+            Event::Photo { path } => {
+                tx.execute(
+                    "INSERT OR IGNORE INTO photos(path, taken_at, visit_id) VALUES (?1, ?2, ?3)",
+                    params![path, t, self.visit],
+                )?;
+            }
         }
         Ok(())
     }

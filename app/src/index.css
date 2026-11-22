@@ -275,3 +275,17 @@ em { font-style: normal; color: var(--accent); }
 .bt-line .dc-line { font-size: 28px; line-height: 1.55; color: var(--tint-ink-2); }
 .bt-line .dc-line b { color: var(--tint-ink); }
 .bt-line .dc-line em { color: var(--tint-accent); font-style: normal; }
+/* 当天有照片：多一行照片格，行程 / 人各少放一点 */
+.bt-grid.with-photos { grid-template-rows: 214px 150px auto minmax(236px, 1fr) auto auto;
+  grid-template-areas: "hero hero hero hero total total" "hero hero hero hero nums nums" "ribbon ribbon ribbon ribbon ribbon ribbon" "stops stops stops people people people" "photos photos photos photos photos photos" "line line line line line line"; }
+.bt-photos { grid-area: photos; gap: 14px; padding-block: 22px; }
+.bt-photo-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.bt-photo { display: flex; flex-direction: column; gap: 6px; font-size: 18px; color: var(--tint-ink-3); }
+.bt-photo-img { aspect-ratio: 16 / 9; border-radius: 12px; }
+.bt-grid.with-photos .bt-nums { gap: 6px 10px; padding-block: 18px; }
+.bt-grid.with-photos .bt-nums b { font-size: 36px; }
+.bt-grid.with-photos .bt-total b { font-size: 58px; }
+.bt-grid.with-photos .bt-ribbon { padding-block: 18px; gap: 10px; }
+.bt-grid.with-photos .bt-photo-img { aspect-ratio: 2 / 1; }
+.bt-grid.with-photos .bt-photos { padding-block: 18px; gap: 10px; }
+.bt-grid.with-photos { grid-template-rows: 214px 150px auto minmax(256px, 1fr) auto auto; }

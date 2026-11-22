@@ -13,11 +13,12 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const top = r.top_worlds[0]
   const day = r.from.slice(0, 10)
   const date = new Date(day + 'T00:00:00')
+  const photos = r.photos.slice(0, 4)
   // 放不下时保留最久的 5 站，按时间排
   const all = itinerary(r.timeline ?? [])
-  const keep = new Set([...all].sort((a, b) => b.minutes - a.minutes).slice(0, 5))
+  const keep = new Set([...all].sort((a, b) => b.minutes - a.minutes).slice(0, photos.length ? 3 : 5))
   const stops = all.filter((s) => keep.has(s))
-  const people = r.top_people.slice(0, 4)
+  const people = r.top_people.slice(0, photos.length ? 3 : 4)
   const maxP = Math.max(1, ...people.map((p) => p.minutes))
   const lastEnd = r.last_logoff ?? r.latest_logoff?.end
   // 占比最多的房间类型（好友 + 好友+ 合并算「好友房」）
@@ -40,7 +41,7 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
         <span className="bt-kind mono">{session ? `本次回顾 · ${clock(r.from)}–${clock(lastEnd ?? r.to)}` : '今日回顾 · 全天'}</span>
       </header>
 
-      <div className="bt-grid">
+      <div className={`bt-grid ${photos.length ? 'with-photos' : ''}`}>
         {top && (
           <Cover id={top.world_id} url={top.thumbnail} className="bt-tile bt-hero">
             <div className="bt-hero-shade" />
@@ -96,6 +97,19 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
             {people.length === 0 && <li className="bt-sub">一个人的旅行</li>}
           </ul>
         </div>
+        {photos.length > 0 && (
+          <div className="bt-tile bt-photos">
+            <span className="bt-label">拍下的瞬间 · {r.photo_count} 张</span>
+            <div className="bt-photo-row">
+              {photos.map((p) => (
+                <div key={p.path} className="bt-photo">
+                  <Cover id={p.path} url={p.url} className="bt-photo-img" />
+                  <span className="mono">{clock(p.taken_at)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="bt-tile bt-line"><Line r={r} priv={priv} /></div>
       </div>
 

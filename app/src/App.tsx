@@ -3,9 +3,7 @@ import dayJson from './demo/day.json'
 import yearJson from './demo/year.json'
 import { exportPng } from './lib/exportPng'
 import type { Privacy } from './lib/format'
-import { DailyCard } from './templates/DailyCard'
-import { BentoCard } from './templates/BentoCard'
-import { ReceiptCard } from './templates/ReceiptCard'
+import { RecapCard, type CardStyle } from './templates/RecapCard'
 import { Canvas } from './templates/parts'
 import { StoryPlayer } from './templates/story/StoryPlayer'
 import { LoggingAlert, useStatus } from './components/LoggingAlert'
@@ -52,9 +50,8 @@ function RenderOnly({ q }: { q: URLSearchParams }) {
   const day = useDay()
   if (q.get('render') === 'day') {
     if (!day) return null
-    const style = q.get('style')
-    const Card = style === 'bento' ? BentoCard : style === 'receipt' ? ReceiptCard : DailyCard
-    return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><Card r={day} priv={priv} /></div>
+    const style = (q.get('style') ?? undefined) as CardStyle | undefined
+    return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><RecapCard r={day} priv={priv} style={style} /></div>
   }
   const page = PAGES[Number(q.get('page') ?? 0)]
   return (
@@ -98,7 +95,7 @@ function Shell() {
         {tab === 'day' ? (
           <div className="player">
             <Canvas ref={cardRef} w={1080} h={1440} scale={scale}>
-              <DailyCard r={day} priv={priv} />
+              <RecapCard r={day} priv={priv} />
             </Canvas>
             <div className="player-bar">
               <span>{day.from.slice(0, 10)} · 今日卡片</span>

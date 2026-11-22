@@ -273,8 +273,20 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
         let rows = st.query_map(params![from_ms, to_ms], |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, i64>(3)?, row.get::<_, Option<i64>>(4)?))
         })?;
+        // 所有日志里认出来过的本人（ID 和名字），一律不算进「遇到的人」
+        let self_ids: HashSet<String> = c
+            .prepare("SELECT DISTINCT self_user_id FROM log_files WHERE self_user_id IS NOT NULL")?
+            .query_map([], |r| r.get(0))?
+            .collect::<Result<_>>()?;
+        let self_names: HashSet<String> = c
+            .prepare("SELECT DISTINCT self_name FROM log_files WHERE self_name IS NOT NULL")?
+            .query_map([], |r| r.get(0))?
+            .collect::<Result<_>>()?;
         for row in rows {
             let (vid, uid, name, ja, la) = row?;
+            if self_ids.contains(&uid) || (!uid.starts_with("usr_") && self_names.contains(&name)) {
+                continue;
+            }
             let Some(v) = visit_by_id.get(&vid) else { continue };
             let a = ja.max(v.a);
             let b = la.unwrap_or(v.b).min(v.b);

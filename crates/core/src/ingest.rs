@@ -214,6 +214,23 @@ impl Tracker {
                 )?;
                 self.visit = Some(tx.last_insert_rowid());
             }
+            Event::LocalPlayer { name } => {
+                // 本人的 OnPlayerJoined 往往比这行先到：把当前房间里同名的记录当作本人，删掉并记下 ID
+                if let Some(v) = self.visit {
+                    let uid: Option<String> = tx
+                        .query_row(
+                            "SELECT user_id FROM encounters WHERE visit_id = ?1 AND display_name = ?2 AND user_id LIKE 'usr_%' LIMIT 1",
+                            params![v, name],
+                            |r| r.get(0),
+                        )
+                        .optional()?;
+                    if self.self_id.is_none() {
+                        self.self_id = uid;
+                    }
+                    tx.execute("DELETE FROM encounters WHERE visit_id = ?1 AND display_name = ?2", params![v, name])?;
+                }
+                self.self_name = Some(name);
+            }
             Event::EnteringRoom { world_name } => {
                 // Entering Room 和 Joining 的先后顺序不固定，两种都兼容
                 let updated = match self.visit {

@@ -10,6 +10,8 @@ use std::sync::OnceLock;
 pub enum Event {
     /// 登录用户本人
     SelfUser { name: String, user_id: Option<String> },
+    /// `Initialized PlayerAPI "名字" is local`：每次进房间都会写，本人是 local，其他人是 remote
+    LocalPlayer { name: String },
     /// `Joining wrld_xxx:12345~friends(usr_...)~region(jp)`
     Joining { world_id: String, instance_id: String, access_type: String },
     /// `Entering Room: 世界名`
@@ -41,6 +43,7 @@ re!(joined_re, r"\[Behaviour\] OnPlayerJoined (.+?)\s*$");
 re!(left_re, r"\[Behaviour\] OnPlayerLeft (.+?)\s*$");
 re!(left_room_re, r"\[Behaviour\] OnLeftRoom\b");
 re!(video_re, r"\[Video Playback\].*?Attempting to resolve URL '(.+?)'");
+re!(local_re, r#"\[Behaviour\] Initialized PlayerAPI "(.+)" is local\s*$"#);
 re!(photo_re, r"\[VRC Camera\] Took screenshot to: (.+?)\s*$");
 re!(user_suffix_re, r"^(.*?)\s+\((usr_[0-9a-fA-F\-]+)\)$");
 
@@ -86,6 +89,11 @@ fn parse_event(line: &str) -> Option<Event> {
         }
         if let Some(c) = entering_re().captures(line) {
             return Some(Event::EnteringRoom { world_name: c[1].to_string() });
+        }
+        if line.contains(" is local") {
+            if let Some(c) = local_re().captures(line) {
+                return Some(Event::LocalPlayer { name: c[1].to_string() });
+            }
         }
         if left_room_re().is_match(line) {
             return Some(Event::LeftRoom);

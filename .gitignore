@@ -2,3 +2,6 @@ references/
 node_modules/
 target/
 dist/
+demo-data/
+samples/*
+!samples/.gitkeep

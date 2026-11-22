@@ -153,12 +153,13 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
             *daily.entry(d).or_default() += ms;
             r.hour_minutes[h as usize] += ms;
         });
-        let stat = SessionStat { start: fmt(tz, a), end: fmt(tz, b), minutes: (b - a) / MIN };
+        // 最长 / 最晚用整次会话的真实起止（跨零点的会话不被时间段截断）
+        let stat = SessionStat { start: fmt(tz, s), end: fmt(tz, e), minutes: (e - s) / MIN };
         if r.longest_session.as_ref().map_or(true, |l| stat.minutes > l.minutes) {
             r.longest_session = Some(stat.clone());
         }
         // 「最晚」：把一天的起点挪到早上 6 点，凌晨 3 点算比晚上 11 点更晚
-        let end_local = tz.to_local(b);
+        let end_local = tz.to_local(e);
         let key = ((end_local.hour() as i64 + 18) % 24) * 60 + end_local.minute() as i64;
         if key > latest_key {
             latest_key = key;

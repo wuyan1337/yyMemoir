@@ -1,0 +1,205 @@
+{
+  "product": "yyMemoir",
+  "kind": "day",
+  "from": "2026-11-20 00:00",
+  "to": "2026-11-21 00:00",
+  "self_name": "夜行的猫",
+  "total_minutes": 159,
+  "play_days": 1,
+  "session_count": 1,
+  "longest_session": {
+    "start": "2026-11-20 21:21",
+    "end": "2026-11-21 00:39",
+    "minutes": 198
+  },
+  "latest_logoff": {
+    "start": "2026-11-20 21:21",
+    "end": "2026-11-21 00:39",
+    "minutes": 198
+  },
+  "peak_hour": 22,
+  "hour_minutes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    39,
+    60,
+    60
+  ],
+  "daily_minutes": [
+    {
+      "date": "2026-11-20",
+      "minutes": 159
+    }
+  ],
+  "monthly_minutes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    159,
+    0
+  ],
+  "busiest_day": {
+    "date": "2026-11-20",
+    "minutes": 159
+  },
+  "world_count": 4,
+  "new_world_count": 0,
+  "top_worlds": [
+    {
+      "world_id": "wrld_5b4c8012-ede7-bd0c-ffb8-8309fadb8908",
+      "name": "Cozy Cabin",
+      "minutes": 78,
+      "visits": 2,
+      "photos": 4,
+      "thumbnail": null
+    },
+    {
+      "world_id": "wrld_70eb9a0a-9626-3ae6-c5e8-18fac0433cbd",
+      "name": "深海水族馆",
+      "minutes": 52,
+      "visits": 1,
+      "photos": 1,
+      "thumbnail": null
+    },
+    {
+      "world_id": "wrld_bef7e268-ffe9-76ab-6058-1ccace1d62e0",
+      "name": "Midnight Karaoke",
+      "minutes": 22,
+      "visits": 1,
+      "photos": 0,
+      "thumbnail": null
+    },
+    {
+      "world_id": "wrld_f38b2ffc-80a4-df5a-51c9-bc701e7ea419",
+      "name": "午夜天台",
+      "minutes": 4,
+      "visits": 1,
+      "photos": 0,
+      "thumbnail": null
+    }
+  ],
+  "people_count": 16,
+  "top_people": [
+    {
+      "user_id": "usr_864fa3f3-eab0-6e9b-65ed-0de47db4304d",
+      "name": "阿柚",
+      "minutes": 137,
+      "is_friend": true,
+      "avatar": null,
+      "best_day": {
+        "date": "2026-11-20",
+        "minutes": 137
+      }
+    },
+    {
+      "user_id": "usr_90624fe3-6b82-e6c9-d82f-b0f1423674a6",
+      "name": "Kumo",
+      "minutes": 124,
+      "is_friend": true,
+      "avatar": null,
+      "best_day": {
+        "date": "2026-11-20",
+        "minutes": 124
+      }
+    },
+    {
+      "user_id": "usr_e01c683e-99a4-6df0-dde3-a361c0099eba",
+      "name": "小鹿Lumi",
+      "minutes": 85,
+      "is_friend": true,
+      "avatar": null,
+      "best_day": {
+        "date": "2026-11-20",
+        "minutes": 85
+      }
+    },
+    {
+      "user_id": "usr_8350a73f-7aac-319f-fb75-9e0fed1d9d16",
+      "name": "糯米团子",
+      "minutes": 83,
+      "is_friend": true,
+      "avatar": null,
+      "best_day": {
+        "date": "2026-11-20",
+        "minutes": 83
+      }
+    },
+    {
+      "user_id": "usr_015c1d5c-e4cf-ed0e-7c1f-9183275e1a38",
+      "name": "Player144",
+      "minutes": 61,
+      "is_friend": false,
+      "avatar": null,
+      "best_day": {
+        "date": "2026-11-20",
+        "minutes": 61
+      }
+    }
+  ],
+  "access_minutes": {
+    "friends+": 152,
+    "public": 4
+  },
+  "photo_count": 5,
+  "top_photo_world": {
+    "world_id": "wrld_5b4c8012-ede7-bd0c-ffb8-8309fadb8908",
+    "name": "Cozy Cabin",
+    "minutes": 78,
+    "visits": 2,
+    "photos": 4,
+    "thumbnail": null
+  },
+  "photos": [
+    {
+      "path": "demo-data/fake-2026/photos/2026-11/VRChat_2026-11-20_21-48-07.184_2560x1440.png",
+      "taken_at": "2026-11-20 21:48",
+      "world_name": "深海水族馆"
+    },
+    {
+      "path": "demo-data/fake-2026/photos/2026-11/VRChat_2026-11-20_22-20-43.901_2560x1440.png",
+      "taken_at": "2026-11-20 22:20",
+      "world_name": "Cozy Cabin"
+    },
+    {
+      "path": "demo-data/fake-2026/photos/2026-11/VRChat_2026-11-20_22-31-06.960_2560x1440.png",
+      "taken_at": "2026-11-20 22:31",
+      "world_name": "Cozy Cabin"
+    },
+    {
+      "path": "demo-data/fake-2026/photos/2026-11/VRChat_2026-11-20_23-22-09.679_2560x1440.png",
+      "taken_at": "2026-11-20 23:22",
+      "world_name": "Cozy Cabin"
+    },
+    {
+      "path": "demo-data/fake-2026/photos/2026-11/VRChat_2026-11-20_23-28-53.426_2560x1440.png",
+      "taken_at": "2026-11-20 23:28",
+      "world_name": "Cozy Cabin"
+    }
+  ]
+}

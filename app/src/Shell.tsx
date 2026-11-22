@@ -333,10 +333,6 @@ function SettingsTab({ priv, setPriv, status, onImported }: { priv: Privacy; set
           <span>开机启动</span>
           <input id="autostart" type="checkbox" checked={!!auto} disabled={!isTauri() || auto === null} onChange={(e) => toggleAuto(e.target.checked)} />
         </label>
-        <label className="row" htmlFor="hide-strangers">
-          <span>隐藏非好友名字</span>
-          <input id="hide-strangers" type="checkbox" checked={priv.hideStrangers} onChange={(e) => setPriv({ ...priv, hideStrangers: e.target.checked })} />
-        </label>
         <label className="row" htmlFor="hide-all">
           <span>隐藏所有名字</span>
           <input id="hide-all" type="checkbox" checked={priv.hideAll} onChange={(e) => setPriv({ ...priv, hideAll: e.target.checked })} />

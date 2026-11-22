@@ -25,6 +25,7 @@ export function coverStyle(id: string, url?: string | null): React.CSSProperties
   return { background: `radial-gradient(circle at 25% 20%, hsl(${(h + 40) % 360} 80% 70% / .9), transparent 55%), linear-gradient(135deg, hsl(${h} 70% 45%), hsl(${(h + 70) % 360} 65% 22%))` }
 }
 
+/** hideStrangers 需要好友列表（要登录 VRChat 才有），做登录功能前界面上不提供 */
 export interface Privacy { hideStrangers: boolean; hideAll: boolean }
 /** 隐私：默认只露出好友的名字和头像 */
 export function shown(p: PersonStat, priv: Privacy) {

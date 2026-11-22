@@ -138,7 +138,11 @@ pub fn recap(store: &Store, tz: TimeConv, kind: &str, from_ms: i64, to_ms: i64, 
 
     // ---- 会话：总时长、天数、时段、最长、最晚下线
     let mut daily: BTreeMap<NaiveDate, i64> = BTreeMap::new();
-    let mut st = c.prepare("SELECT start_at, end_at FROM sessions WHERE end_at > ?1 AND start_at < ?2")?;
+    // 游玩时间从第一次进房间算起；登录失败、没进过任何房间的启动不算
+    let mut st = c.prepare(
+        "SELECT MIN(v.join_at), s.end_at FROM sessions s JOIN visits v ON v.session_id = s.id
+         GROUP BY s.id HAVING s.end_at > ?1 AND MIN(v.join_at) < ?2",
+    )?;
     let sessions: Vec<(i64, i64)> =
         st.query_map(params![from_ms, to_ms], |row| Ok((row.get(0)?, row.get(1)?)))?.collect::<Result<_>>()?;
     let mut latest_key = i64::MIN;

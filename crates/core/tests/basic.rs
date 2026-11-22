@@ -31,7 +31,8 @@ fn incremental_ingest_and_recap() {
 
     assert_eq!(r.self_name.as_deref(), Some("测试用户"));
     assert_eq!(r.session_count, 1);
-    assert_eq!(r.total_minutes, 120);
+    // 从第一次进房间（20:01）算到最后一条日志（22:00:32）
+    assert_eq!(r.total_minutes, 119);
     assert_eq!(r.world_count, 3);
     assert_eq!(r.top_worlds[0].name, "黑猫酒吧");
     assert_eq!(r.top_worlds[0].minutes, 90);
@@ -45,6 +46,6 @@ fn incremental_ingest_and_recap() {
     assert_eq!(r.top_people[2].minutes, 19);
     assert_eq!(r.access_minutes.get("friends"), Some(&90));
     assert_eq!(r.access_minutes.get("invite"), Some(&9));
-    assert_eq!(r.peak_hour, Some(20));
+    assert_eq!(r.peak_hour, Some(21)); // 20 点只有 59 分钟，21 点满 60 分钟
     std::fs::remove_dir_all(&dir).ok();
 }

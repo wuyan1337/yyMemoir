@@ -4,7 +4,7 @@ export interface DayStat { date: string; minutes: number }
 export interface WorldStat { world_id: string; name: string; minutes: number; visits: number; photos: number; thumbnail: string | null }
 export interface PersonStat { user_id: string; name: string; minutes: number; is_friend: boolean; avatar: string | null; best_day: DayStat | null }
 export interface Stop { world_id: string; name: string; access_type: string; start: string; end: string; minutes: number; thumbnail: string | null }
-export interface PhotoStat { path: string; taken_at: string; world_name: string | null }
+export interface PhotoStat { path: string; taken_at: string; world_name: string | null; /** 前端可加载的地址（Tauri 里由 convertFileSrc 生成） */ url?: string | null }
 export interface Recap {
   product: string; kind: string; from: string; to: string; self_name: string | null;
   total_minutes: number; play_days: number; session_count: number;

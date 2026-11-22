@@ -266,12 +266,14 @@ function BackupRows({ onImported }: { onImported: () => void }) {
   const [file, setFile] = useState<string | null>(null)
   const [confirmReplace, setConfirmReplace] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [original, setOriginal] = useState(false)
   const kb = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
   const doExport = async () => {
     setBusy(true)
     try {
-      const s = await exportBackup()
-      if (s) setMsg(`已导出 ${s.sessions} 次游玩 · ${kb(s.bytes)}`)
+      setMsg('导出中…')
+      const s = await exportBackup(original)
+      setMsg(s ? `已导出 ${s.sessions} 次游玩 · ${s.photo_files} 张照片 · ${s.covers} 个封面 · ${kb(s.bytes)}` : null)
     } catch (e) { setMsg(`导出失败：${e}`) }
     setBusy(false)
   }
@@ -279,8 +281,10 @@ function BackupRows({ onImported }: { onImported: () => void }) {
     if (!file) return
     setBusy(true)
     try {
+      setMsg('导入中…')
       const r = await importBackup(file, mode)
-      setMsg(mode === 'merge' ? `已合并：新增 ${r.added} 次，跳过 ${r.skipped} 次（本机已有）` : `已覆盖：共 ${r.added} 次游玩`)
+      const img = `还原 ${r.photos_restored} 张照片、${r.covers_restored} 个封面`
+      setMsg(mode === 'merge' ? `已合并：新增 ${r.added} 次，跳过 ${r.skipped} 次（本机已有）· ${img}` : `已覆盖：共 ${r.added} 次游玩 · ${img}`)
       setFile(null); setConfirmReplace(false); onImported()
     } catch (e) { setMsg(`导入失败：${e}`) }
     setBusy(false)
@@ -289,6 +293,9 @@ function BackupRows({ onImported }: { onImported: () => void }) {
     <>
       <div className="row">
         <span>备份</span>
+        <label className="inline" htmlFor="bk-original">
+          <input id="bk-original" type="checkbox" checked={original} onChange={(e) => setOriginal(e.target.checked)} />照片用原图
+        </label>
         <button className="btn" disabled={busy || !isTauri()} onClick={doExport}>导出</button>
         <button className="btn" disabled={busy || !isTauri()} onClick={async () => { setMsg(null); setConfirmReplace(false); setFile(await pickBackup()) }}>导入</button>
       </div>

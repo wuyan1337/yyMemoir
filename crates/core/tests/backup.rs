@@ -57,3 +57,50 @@ fn rejects_other_files() {
     bad.extend_from_slice(b"garbage garbage");
     assert!(matches!(import(&mut s, &bad, ImportMode::Merge), Err(BackupError::Corrupt(_))));
 }
+
+/// 带图片：换电脑（原图不在了）→ 照片和封面还原到新位置，记录指向新位置；同一台电脑原图还在 → 不重复写
+#[test]
+fn images_roundtrip() {
+    use yymemoir_core::backup::{export_to, import_from, ExportOptions, ImportTargets};
+    let tmp = std::env::temp_dir().join(format!("yym-img-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let photo = tmp.join("VRChat_2026-04-30_20-20-00.123_1920x1080.png");
+    image::RgbImage::from_fn(2400, 1350, |x, y| image::Rgb([(x % 256) as u8, (y % 256) as u8, 128])).save(&photo).unwrap();
+    let cover = tmp.join("cover.png");
+    image::RgbImage::from_pixel(800, 600, image::Rgb([20, 40, 60])).save(&cover).unwrap();
+
+    let src = store_with_fixture("img");
+    src.conn.execute("UPDATE photos SET path = ?1", [photo.to_string_lossy()]).unwrap();
+    src.conn
+        .execute(
+            "INSERT INTO worlds_cache(world_id, name, thumbnail_path) VALUES ('wrld_22222222-2222-2222-2222-222222222222', '黑猫酒吧', ?1)",
+            [cover.to_string_lossy()],
+        )
+        .unwrap();
+    let mut buf = Vec::new();
+    let sum = export_to(&src, &mut buf, ExportOptions::default()).unwrap();
+    assert_eq!((sum.photo_files, sum.covers), (1, 1));
+    assert_eq!(sum.bytes as usize, buf.len());
+
+    let targets = ImportTargets { photo_dir: tmp.join("restored-photos"), cover_dir: tmp.join("restored-covers") };
+
+    // 同一台电脑：原图还在，不重复写
+    let mut same = Store::open_in_memory().unwrap();
+    let rep = import_from(&mut same, &buf[..], ImportMode::Merge, Some(&targets)).unwrap();
+    assert_eq!(rep.photos_restored, 0);
+
+    // 换电脑：原图和封面都不在了
+    std::fs::remove_file(&photo).unwrap();
+    std::fs::remove_file(&cover).unwrap();
+    let mut dst = Store::open_in_memory().unwrap();
+    let rep = import_from(&mut dst, &buf[..], ImportMode::Replace, Some(&targets)).unwrap();
+    assert_eq!((rep.added, rep.photos_restored, rep.covers_restored), (1, 1, 1));
+    let new_path: String = dst.conn.query_row("SELECT path FROM photos", [], |r| r.get(0)).unwrap();
+    assert!(new_path.contains("restored-photos") && new_path.contains("2026-04") && new_path.ends_with(".jpg"));
+    let img = image::open(&new_path).unwrap();
+    assert_eq!(img.width(), 1920); // 压缩：长边 1920
+    let thumb: String = dst.conn.query_row("SELECT thumbnail_path FROM worlds_cache", [], |r| r.get(0)).unwrap();
+    assert!(std::path::Path::new(&thumb).exists());
+    assert_eq!(summary(&dst), summary(&src));
+    std::fs::remove_dir_all(&tmp).ok();
+}

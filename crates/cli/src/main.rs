@@ -129,19 +129,33 @@ fn main() {
         "export" => {
             let store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");
             let out = arg(&args, "--out").expect("--out");
-            let (bytes, sum) = yymemoir_core::backup::export(&store).expect("export");
-            std::fs::write(&out, &bytes).expect("write");
-            eprintln!("导出 {} 次游玩、{} 个房间、{} 张照片 → {}（{} KB）", sum.sessions, sum.visits, sum.photos, out, bytes.len() / 1024);
+            let original = args.iter().any(|a| a == "--original");
+            let opts = yymemoir_core::backup::ExportOptions {
+                photos: Some(if original { yymemoir_core::backup::PhotoQuality::Original } else { yymemoir_core::backup::PhotoQuality::Compressed }),
+                covers: true,
+            };
+            let sum = yymemoir_core::backup::export_to(&store, std::fs::File::create(&out).expect("create"), opts).expect("export");
+            eprintln!(
+                "导出 {} 次游玩、{} 个房间、{} 张照片（带文件 {}）、{} 个封面 → {}（{} KB）",
+                sum.sessions, sum.visits, sum.photos, sum.photo_files, sum.covers, out, sum.bytes / 1024
+            );
         }
         "import" => {
-            let mut store = Store::open(arg(&args, "--db").expect("--db")).expect("open db");
-            let bytes = std::fs::read(arg(&args, "--in").expect("--in")).expect("read");
+            let db = arg(&args, "--db").expect("--db");
+            let mut store = Store::open(&db).expect("open db");
+            let file = std::fs::File::open(arg(&args, "--in").expect("--in")).expect("read");
+            // 图片还原到数据库旁边的 photos/ 和 world-cache/
+            let base = Path::new(&db).parent().unwrap_or(Path::new(".")).to_path_buf();
+            let targets = yymemoir_core::backup::ImportTargets { photo_dir: base.join("photos"), cover_dir: base.join("world-cache") };
             let mode = match arg(&args, "--mode").as_deref() {
                 Some("replace") => yymemoir_core::backup::ImportMode::Replace,
                 _ => yymemoir_core::backup::ImportMode::Merge,
             };
-            match yymemoir_core::backup::import(&mut store, &bytes, mode) {
-                Ok(r) => eprintln!("导入完成：新增 {} 次游玩，跳过 {} 次（本机已有）", r.added, r.skipped),
+            match yymemoir_core::backup::import_from(&mut store, file, mode, Some(&targets)) {
+                Ok(r) => eprintln!(
+                    "导入完成：新增 {} 次游玩，跳过 {} 次（本机已有），还原照片 {} 张、封面 {} 个",
+                    r.added, r.skipped, r.photos_restored, r.covers_restored
+                ),
                 Err(e) => eprintln!("导入失败：{e}"),
             }
         }

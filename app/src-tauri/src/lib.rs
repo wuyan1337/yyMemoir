@@ -110,12 +110,20 @@ fn image_data(st: State<AppState>, path: String, max: Option<u32>) -> Result<Str
     Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buf.into_inner())))
 }
 
-/// 导出备份到 `path`（.yymb）
+/// 导出备份到 `path`（.yymb），含照片和封面；`original` 为 true 时照片放原图
 #[tauri::command]
-fn export_backup(st: State<AppState>, path: String) -> Result<yymemoir_core::backup::BackupSummary, String> {
-    let (bytes, sum) = yymemoir_core::backup::export(&open_store(&st)?).map_err(|e| e.to_string())?;
-    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
-    log::log(format!("导出备份 {path}（{} 次游玩，{} 字节）", sum.sessions, sum.bytes));
+fn export_backup(st: State<AppState>, path: String, original: Option<bool>) -> Result<yymemoir_core::backup::BackupSummary, String> {
+    use yymemoir_core::backup::{export_to, ExportOptions, PhotoQuality};
+    let opts = ExportOptions {
+        photos: Some(if original.unwrap_or(false) { PhotoQuality::Original } else { PhotoQuality::Compressed }),
+        covers: true,
+    };
+    let file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
+    let sum = export_to(&open_store(&st)?, file, opts).map_err(|e| {
+        std::fs::remove_file(&path).ok();
+        e.to_string()
+    })?;
+    log::log(format!("导出备份 {path}（{} 次游玩，{} 张照片，{} 个封面，{} 字节）", sum.sessions, sum.photo_files, sum.covers, sum.bytes));
     Ok(sum)
 }
 
@@ -123,11 +131,18 @@ fn export_backup(st: State<AppState>, path: String) -> Result<yymemoir_core::bac
 #[tauri::command]
 fn import_backup(app: tauri::AppHandle, st: State<AppState>, path: String, mode: String) -> Result<yymemoir_core::backup::ImportReport, String> {
     use yymemoir_core::backup::ImportMode;
-    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
     let m = if mode == "replace" { ImportMode::Replace } else { ImportMode::Merge };
+    let targets = yymemoir_core::backup::ImportTargets {
+        photo_dir: st.paths.restored_photos.clone(),
+        cover_dir: st.paths.world_cache.clone(),
+    };
     let mut store = open_store(&st)?;
-    let rep = yymemoir_core::backup::import(&mut store, &bytes, m).map_err(|e| e.to_string())?;
-    log::log(format!("导入备份 {path}（{mode}）：新增 {}，跳过 {}", rep.added, rep.skipped));
+    let rep = yymemoir_core::backup::import_from(&mut store, file, m, Some(&targets)).map_err(|e| e.to_string())?;
+    log::log(format!(
+        "导入备份 {path}（{mode}）：新增 {}，跳过 {}，还原照片 {}，封面 {}",
+        rep.added, rep.skipped, rep.photos_restored, rep.covers_restored
+    ));
     let paths = st.paths.clone();
     std::thread::spawn(move || {
         if let Ok(store) = Store::open(&paths.db) {

@@ -97,16 +97,16 @@ export function shiftDate(date: string, kind: PeriodKind, n: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export interface BackupSummary { sessions: number; visits: number; photos: number; bytes: number }
-export interface ImportReport { added: number; skipped: number }
+export interface BackupSummary { sessions: number; visits: number; photos: number; photo_files: number; covers: number; bytes: number }
+export interface ImportReport { added: number; skipped: number; photos_restored: number; covers_restored: number }
 
 /** 选位置并导出备份；取消返回 null */
-export async function exportBackup(): Promise<BackupSummary | null> {
+export async function exportBackup(original: boolean): Promise<BackupSummary | null> {
   if (!isTauri()) return null
   const { save } = await import('@tauri-apps/plugin-dialog')
   const path = await save({ defaultPath: `yyMemoir-备份-${today()}.yymb`, filters: [{ name: 'yyMemoir 备份', extensions: ['yymb'] }] })
   if (!path) return null
-  return invoke<BackupSummary>('export_backup', { path })
+  return invoke<BackupSummary>('export_backup', { path, original })
 }
 
 /** 选备份文件；取消返回 null */

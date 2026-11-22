@@ -359,3 +359,4 @@ em { font-style: normal; color: var(--accent); }
 .settings-body .row-note { margin: 0 4px 6px; font-size: 12px; color: var(--ink-3); }
 .btn.danger { border-color: #ff8a7a; color: #ff8a7a; }
 .btn.ghost { border-color: transparent; color: var(--ink-3); min-width: 0; }
+.settings-body .inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); cursor: pointer; }

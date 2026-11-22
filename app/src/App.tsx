@@ -4,6 +4,8 @@ import yearJson from './demo/year.json'
 import { exportPng } from './lib/exportPng'
 import type { Privacy } from './lib/format'
 import { DailyCard } from './templates/DailyCard'
+import { BentoCard } from './templates/BentoCard'
+import { ReceiptCard } from './templates/ReceiptCard'
 import { Canvas } from './templates/parts'
 import { StoryPlayer } from './templates/story/StoryPlayer'
 import { LoggingAlert, useStatus } from './components/LoggingAlert'
@@ -46,11 +48,13 @@ function useFitScale(ref: React.RefObject<HTMLElement | null>, w: number, h: num
 
 /** 渲染模式：?render=day 或 ?render=year&page=N，只输出 1:1 画布，给 scripts/render.mjs 截图用 */
 function RenderOnly({ q }: { q: URLSearchParams }) {
-  const priv: Privacy = { hideStrangers: q.get('hide') !== '0', hideAll: q.get('hideAll') === '1' }
+  const priv: Privacy = { hideStrangers: q.get('hide') === '1', hideAll: q.get('hideAll') === '1' }
   const day = useDay()
   if (q.get('render') === 'day') {
     if (!day) return null
-    return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><DailyCard r={day} priv={priv} /></div>
+    const style = q.get('style')
+    const Card = style === 'bento' ? BentoCard : style === 'receipt' ? ReceiptCard : DailyCard
+    return <div id="shot" style={{ width: 1080, height: 1440, position: 'relative', overflow: 'hidden' }}><Card r={day} priv={priv} /></div>
   }
   const page = PAGES[Number(q.get('page') ?? 0)]
   return (
@@ -68,7 +72,7 @@ export default function App() {
 
 function Shell() {
   const [tab, setTab] = useState<Tab>('year')
-  const [priv, setPriv] = useState<Privacy>({ hideStrangers: true, hideAll: false })
+  const [priv, setPriv] = useState<Privacy>({ hideStrangers: false, hideAll: false })
   const [busy, setBusy] = useState(false)
   const day = useDay() ?? DEMO_DAY
   const status = useStatus()

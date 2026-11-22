@@ -9,15 +9,15 @@ import { Brand, Cover } from './parts'
  * 当天拍了照才出现照片条；底部是一起最久的人。整张卡的色调从封面里取。
  */
 
-const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-const hm = (m: number) => {
+export const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+export const hm = (m: number) => {
   const h = Math.floor(m / 60), r = m % 60
   return h ? (r ? `${h}h ${String(r).padStart(2, '0')}m` : `${h}h`) : `${r}m`
 }
-const clock = (s: string) => s.slice(11, 16)
+export const clock = (s: string) => s.slice(11, 16)
 
 /** 去掉开游戏时的短暂停留（< 5 分钟），连续同一个世界合并（时长累加，起止取首尾） */
-function itinerary(stops: Stop[]): Stop[] {
+export function itinerary(stops: Stop[]): Stop[] {
   const out: Stop[] = []
   for (const s of stops) {
     if (s.minutes < 5) continue
@@ -29,13 +29,13 @@ function itinerary(stops: Stop[]): Stop[] {
   return out
 }
 
-const cn = (m: number) => {
+export const cn = (m: number) => {
   const h = Math.floor(m / 60), r = m % 60
   return h ? (r ? `${h} 小时 ${r} 分` : `${h} 小时`) : `${r} 分钟`
 }
 
 /** 一句有情绪的总结：去哪最久、和谁最久、熬到几点 */
-function Line({ r, priv }: { r: Recap; priv: Privacy }) {
+export function Line({ r, priv }: { r: Recap; priv: Privacy }) {
   const top = r.top_worlds[0]
   const p = r.top_people[0]
   const last = r.last_logoff
@@ -51,12 +51,12 @@ function Line({ r, priv }: { r: Recap; priv: Privacy }) {
 }
 
 /** 某个时间点在当天的分钟数（跨到第二天的算 1440） */
-function minuteOfDay(t: string, day: string) {
+export function minuteOfDay(t: string, day: string) {
   if (t.slice(0, 10) > day) return 1440
   return Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16))
 }
 
-function DayRibbon({ stops, day, longest }: { stops: Stop[]; day: string; longest?: string }) {
+export function DayRibbon({ stops, day, longest }: { stops: Stop[]; day: string; longest?: string }) {
   return (
     <div className="dc-ribbon">
       <div className="dc-ribbon-track">
@@ -76,12 +76,14 @@ function DayRibbon({ stops, day, longest }: { stops: Stop[]; day: string; longes
   )
 }
 
-export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
-  const top = r.top_worlds[0]
-  const tone = useTone(top?.thumbnail)
+/** 整张卡的色调：从待得最久的世界封面取色 */
+export function useCardTone(r: Recap) {
+  const tone = useTone(r.top_worlds[0]?.thumbnail)
   const h = Math.round(tone?.h ?? 230)
   const sat = Math.round(Math.max(18, Math.min(45, (tone?.s ?? 0.3) * 60)))
-  const style = {
+  return {
+
+    '--tint-bg-2': `hsl(${h} ${sat}% 13%)`,
     '--tint-bg': `hsl(${h} ${sat}% 9%)`,
     '--tint-ink': `hsl(${h} 30% 94%)`,
     '--tint-ink-2': `hsl(${h} 14% 72%)`,
@@ -90,7 +92,15 @@ export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
     '--tint-track': `hsl(${h} 20% 100% / .07)`,
     '--tint-seg': `hsl(${h} 30% 58%)`,
     '--tint-accent': `hsl(${h} 70% 78%)`,
+    '--tint-paper': `hsl(${h} 22% 95%)`,
+    '--tint-paper-ink': `hsl(${h} 25% 14%)`,
+    '--tint-paper-ink-2': `hsl(${h} 10% 42%)`,
   } as React.CSSProperties
+}
+
+export function DailyCard({ r, priv }: { r: Recap; priv: Privacy }) {
+  const top = r.top_worlds[0]
+  const style = useCardTone(r)
 
   const day = r.from.slice(0, 10)
   const date = new Date(day + 'T00:00:00')

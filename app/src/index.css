@@ -193,3 +193,85 @@ em { font-style: normal; color: var(--accent); }
 @media (max-width: 640px) {
   .privacy { margin-left: 0; }
 }
+
+/* ---------- 方向 A：便当格 1080×1440 ---------- */
+.bt { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 22px; padding: 52px 52px 40px; background: var(--tint-bg); color: var(--tint-ink); }
+.bt-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; position: relative; z-index: 2; }
+.bt-date { display: flex; align-items: baseline; gap: 18px; }
+.bt-date b { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 96px; line-height: .9; letter-spacing: -.03em; }
+.bt-date span { font-size: 24px; letter-spacing: .2em; color: var(--tint-ink-3); }
+.bt-kind { font-size: 22px; letter-spacing: .12em; color: var(--tint-ink-2); padding-bottom: 6px; }
+.bt-grid { flex: 1; min-height: 0; position: relative; z-index: 2; display: grid; gap: 18px;
+  grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: 280px 190px auto minmax(0, 1fr) auto;
+  grid-template-areas: "hero hero hero hero total total" "hero hero hero hero nums nums" "ribbon ribbon ribbon ribbon ribbon ribbon" "stops stops stops people people people" "line line line line line line"; }
+.bt-tile { background: var(--tint-bg-2); border-radius: 28px; padding: 26px 28px; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.bt-label { font-size: 20px; letter-spacing: .14em; color: var(--tint-ink-3); }
+.bt-sub { font-size: 22px; color: var(--tint-ink-3); }
+.bt-hero { grid-area: hero; position: relative; padding: 0; }
+.bt-hero-shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, #000000d9 78%); }
+.bt-hero-cap { position: absolute; left: 28px; right: 28px; bottom: 24px; display: flex; flex-direction: column; gap: 6px; }
+.bt-hero-cap .bt-label { color: #fffc; }
+.bt-hero-cap b { font-size: 40px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+.bt-hero-cap .mono { font-size: 22px; color: #ffffffd0; }
+.bt-total { grid-area: total; justify-content: space-between; }
+.bt-total b { white-space: nowrap; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: -.02em; color: var(--tint-accent); }
+.bt-nums { grid-area: nums; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; align-content: center; }
+.bt-nums div { display: flex; flex-direction: column; }
+.bt-nums b { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 44px; line-height: 1.05; }
+.bt-nums span { font-size: 19px; color: var(--tint-ink-3); }
+.bt-ribbon { grid-area: ribbon; gap: 14px; padding-block: 22px; }
+.bt-stops { grid-area: stops; gap: 14px; }
+.bt-stops ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.bt-stops li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 16px; align-items: center; }
+.bt-thumb { width: 64px; height: 44px; border-radius: 8px; grid-row: 1 / 3; }
+.bt-sname { font-size: 23px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-stime { grid-column: 2; font-size: 18px; color: var(--tint-ink-3); }
+.bt-sdur { grid-column: 3; grid-row: 1 / 3; font-size: 21px; color: var(--tint-ink-2); }
+.bt-people { grid-area: people; gap: 16px; }
+.bt-people ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.bt-prow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.bt-prow b { font-size: 25px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-prow span { font-size: 20px; color: var(--tint-ink-2); flex: none; }
+.bt-pbar { height: 8px; border-radius: 4px; background: var(--tint-track); margin-top: 8px; }
+.bt-pbar i { display: block; height: 100%; border-radius: 4px; background: var(--tint-seg); }
+.bt-people li:first-child .bt-pbar i { background: var(--tint-accent); }
+.bt-foot { display: flex; justify-content: flex-end; position: relative; z-index: 2; }
+.bt .brand { color: var(--tint-ink-3); font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: 26px; letter-spacing: 0; }
+
+/* ---------- 方向 B：小票 1080×1440 ---------- */
+.rc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--tint-bg); overflow: hidden; }
+.rc-bg { position: absolute; inset: -60px; filter: blur(28px) saturate(1.1); transform: scale(1.1); }
+.rc-bg-shade { position: absolute; inset: 0; background: color-mix(in srgb, var(--tint-bg) 55%, transparent); }
+.rc-paper { position: relative; width: 800px; max-height: 1340px; background: var(--tint-paper); color: var(--tint-paper-ink); padding: 56px 56px 44px;
+  box-shadow: 0 30px 80px #0008; transform: rotate(-1.2deg);
+  -webkit-mask: radial-gradient(circle 11px at 50% 0, #0000 98%, #000) 50% 0 / 30px 51% repeat-x, radial-gradient(circle 11px at 50% 100%, #0000 98%, #000) 50% 100% / 30px 51% repeat-x;
+          mask: radial-gradient(circle 11px at 50% 0, #0000 98%, #000) 50% 0 / 30px 51% repeat-x, radial-gradient(circle 11px at 50% 100%, #0000 98%, #000) 50% 100% / 30px 51% repeat-x; }
+.rc-top { text-align: center; display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px; border-bottom: 2px dashed var(--tint-paper-ink-2); }
+.rc-brand { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 56px; letter-spacing: -.01em; }
+.rc-meta { display: flex; flex-direction: column; gap: 6px; font-size: 20px; color: var(--tint-paper-ink-2); }
+.rc-cols { display: flex; justify-content: space-between; font-size: 19px; letter-spacing: .2em; color: var(--tint-paper-ink-2); margin: 22px 0 8px; }
+.rc-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rc-items li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: start; }
+.rc-items li > .rc-qty, .rc-items li > .rc-dur { line-height: 34px; }
+.rc-qty { font-size: 20px; color: var(--tint-paper-ink-2); }
+.rc-name { font-size: 26px; font-weight: 600; line-height: 1.3; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-name small { display: block; font-size: 18px; font-weight: 400; color: var(--tint-paper-ink-2); margin-top: 2px; }
+.rc-dur { font-size: 24px; }
+.rc-rule { border-top: 2px dashed var(--tint-paper-ink-2); margin: 22px 0; opacity: .6; }
+.rc-rule.double { border-top: 4px double var(--tint-paper-ink); opacity: 1; }
+.rc-sub { font-size: 19px; letter-spacing: .2em; color: var(--tint-paper-ink-2); margin: -6px 0 10px; }
+.rc-rows { display: flex; flex-direction: column; gap: 8px; font-size: 22px; }
+.rc-rows div { display: flex; justify-content: space-between; align-items: center; gap: 20px; line-height: 1.4; }
+.rc-rows span:first-child { font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+.rc-more { font-size: 19px; color: var(--tint-paper-ink-2); margin: 10px 0 0 58px; }
+.rc-person { font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 30px; font-weight: 700; }
+.rc-total b { font-family: "Bricolage Grotesque", sans-serif; font-size: 64px; font-weight: 800; letter-spacing: -.02em; }
+.rc-end { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 28px; }
+.rc-barcode { display: flex; height: 72px; }
+.rc-barcode i { display: block; height: 100%; background: var(--tint-paper-ink); }
+.rc-thanks { font-size: 18px; letter-spacing: .3em; color: var(--tint-paper-ink-2); }
+.bt-line { grid-area: line; padding: 24px 28px; }
+.bt-line .dc-line { font-size: 28px; line-height: 1.55; color: var(--tint-ink-2); }
+.bt-line .dc-line b { color: var(--tint-ink); }
+.bt-line .dc-line em { color: var(--tint-accent); font-style: normal; }

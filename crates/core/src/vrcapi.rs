@@ -29,7 +29,7 @@ pub fn fetch_missing_worlds(store: &Store, cache_dir: &Path, limit: usize) -> ru
         let rows = st.query_map([limit as i64], |r| r.get(0))?;
         rows.collect::<rusqlite::Result<_>>()?
     };
-    let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(20)).user_agent(USER_AGENT).build();
+    let agent = agent()?;
     let mut rep = FetchReport::default();
     for (i, id) in ids.iter().enumerate() {
         if i > 0 {
@@ -72,4 +72,20 @@ fn fetch_one(agent: &ureq::Agent, id: &str, cache_dir: &Path) -> Result<(String,
     let path = cache_dir.join(format!("{id}.{ext}"));
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok((name, author, path.to_string_lossy().to_string()))
+}
+
+fn builder() -> ureq::AgentBuilder {
+    ureq::AgentBuilder::new().timeout(Duration::from_secs(20)).user_agent(USER_AGENT)
+}
+
+/// Windows：系统 TLS（schannel）
+#[cfg(windows)]
+fn agent() -> rusqlite::Result<ureq::Agent> {
+    let tls = native_tls::TlsConnector::new().map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+    Ok(builder().tls_connector(std::sync::Arc::new(tls)).build())
+}
+
+#[cfg(not(windows))]
+fn agent() -> rusqlite::Result<ureq::Agent> {
+    Ok(builder().build())
 }

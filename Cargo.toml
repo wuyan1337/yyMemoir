@@ -1,3 +1,5 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/cli"]
+members = ["crates/core", "crates/cli", "app/src-tauri"]
+# Linux 开发机上默认只编核心和 CLI；桌面端（Tauri）在 Windows / CI 上编
+default-members = ["crates/core", "crates/cli"]

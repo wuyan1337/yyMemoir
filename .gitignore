@@ -7,3 +7,4 @@ samples/*
 !samples/.gitkeep
 app/public/real/
 preview/r-*/
+app/src-tauri/gen/

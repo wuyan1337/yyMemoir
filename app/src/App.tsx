@@ -1,20 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import dayJson from './demo/day.json'
 import yearJson from './demo/year.json'
-import { exportPng } from './lib/exportPng'
 import type { Privacy } from './lib/format'
 import { RecapCard, type CardStyle } from './templates/RecapCard'
-import { Canvas } from './templates/parts'
-import { StoryPlayer } from './templates/story/StoryPlayer'
-import { LoggingAlert, useStatus } from './components/LoggingAlert'
+import { Shell } from './Shell'
 import { PAGES } from './templates/story/pages'
 import type { Recap } from './types'
 
 // 演示数据：由 scripts/gen_fake_logs.py 生成假日志 → yymemoir-cli recap 算出来的真实 Recap JSON
 const DEMO_DAY = dayJson as Recap
 const DEMO_YEAR = yearJson as Recap
-
-type Tab = 'day' | 'year'
 
 /** 有真实数据（public/real/day.json，不入库）就用真实的今日数据，否则用演示数据 */
 function useDay() {
@@ -25,23 +20,6 @@ function useDay() {
     fetch(src).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => setDay(d ?? DEMO_DAY))
   }, [])
   return day
-}
-
-function useFitScale(ref: React.RefObject<HTMLElement | null>, w: number, h: number) {
-  const [s, setS] = useState(0.3)
-  useEffect(() => {
-    const fit = () => {
-      const el = ref.current
-      if (!el) return
-      const availW = el.clientWidth
-      const availH = window.innerHeight - el.getBoundingClientRect().top - 90
-      setS(Math.max(0.15, Math.min(availW / w, availH / h, 1)))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [ref, w, h])
-  return s
 }
 
 /** 渲染模式：?render=day 或 ?render=year&page=N，只输出 1:1 画布，给 scripts/render.mjs 截图用 */
@@ -65,52 +43,4 @@ export default function App() {
   const q = new URLSearchParams(location.search)
   if (q.has('render')) return <RenderOnly q={q} />
   return <Shell />
-}
-
-function Shell() {
-  const [tab, setTab] = useState<Tab>('year')
-  const [priv, setPriv] = useState<Privacy>({ hideStrangers: false, hideAll: false })
-  const [busy, setBusy] = useState(false)
-  const day = useDay() ?? DEMO_DAY
-  const status = useStatus()
-  const stageRef = useRef<HTMLDivElement>(null)
-  const cardRef = useRef<HTMLDivElement>(null)
-  const scale = useFitScale(stageRef, 1080, tab === 'day' ? 1440 : 1920)
-
-  return (
-    <div className="app">
-      <header className="topbar">
-        <div className="logo">yyMemoir</div>
-        <nav className="tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'day'} onClick={() => setTab('day')}>今日回顾</button>
-          <button role="tab" aria-selected={tab === 'year'} onClick={() => setTab('year')}>年度报告</button>
-        </nav>
-        <div className="privacy">
-          <label><input type="checkbox" checked={priv.hideStrangers} onChange={(e) => setPriv({ ...priv, hideStrangers: e.target.checked })} /> 隐藏非好友</label>
-          <label><input type="checkbox" checked={priv.hideAll} onChange={(e) => setPriv({ ...priv, hideAll: e.target.checked })} /> 隐藏所有人</label>
-        </div>
-      </header>
-      <LoggingAlert status={status} />
-      <main ref={stageRef} className="stage">
-        {tab === 'day' ? (
-          <div className="player">
-            <Canvas ref={cardRef} w={1080} h={1440} scale={scale}>
-              <RecapCard r={day} priv={priv} />
-            </Canvas>
-            <div className="player-bar">
-              <span>{day.from.slice(0, 10)} · 今日卡片</span>
-              <button disabled={busy} onClick={async () => {
-                if (!cardRef.current) return
-                setBusy(true)
-                await exportPng(cardRef.current, `yyMemoir-${day.from.slice(0, 10)}.png`)
-                setBusy(false)
-              }}>保存图片</button>
-            </div>
-          </div>
-        ) : (
-          <StoryPlayer r={DEMO_YEAR} priv={priv} scale={scale} />
-        )}
-      </main>
-    </div>
-  )
 }

@@ -1,6 +1,6 @@
 import { shown, type Privacy } from '../lib/format'
 import type { Recap } from '../types'
-import { DayRibbon, Line, WEEK, clock, hm, itinerary, useCardTone } from './DailyCard'
+import { DayRibbon, Line, WEEK, clock, hm, itinerary, periodWord, useCardTone } from './DailyCard'
 import { Brand, Cover } from './parts'
 
 /**
@@ -10,6 +10,12 @@ import { Brand, Cover } from './parts'
 export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
   const style = useCardTone(r)
   const session = r.kind === 'session'
+  // 周报 / 月报：时间轴换成每天的柱子，行程换成最常去的世界
+  const multiDay = r.kind === 'week' || r.kind === 'month'
+  const lastDay = (() => {
+    const d = new Date(new Date(r.to.slice(0, 10) + 'T00:00:00').getTime() - 86400000)
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  })()
   const top = r.top_worlds[0]
   const day = r.from.slice(0, 10)
   const date = new Date(day + 'T00:00:00')
@@ -17,7 +23,9 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
   // 放不下时保留最久的 5 站，按时间排
   const all = itinerary(r.timeline ?? [])
   const keep = new Set([...all].sort((a, b) => b.minutes - a.minutes).slice(0, photos.length ? 3 : 5))
-  const stops = all.filter((s) => keep.has(s))
+  const stops = multiDay
+    ? r.top_worlds.slice(0, photos.length ? 3 : 5).map((w) => ({ world_id: w.world_id, name: w.name, thumbnail: w.thumbnail, minutes: w.minutes, start: `来过 ${w.visits} 次`, end: '', access_type: '' }))
+    : all.filter((s) => keep.has(s))
   const people = r.top_people.slice(0, photos.length ? 3 : 4)
   const maxP = Math.max(1, ...people.map((p) => p.minutes))
   const lastEnd = r.last_logoff ?? r.latest_logoff?.end
@@ -35,10 +43,12 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
       <div className="dc-grain" />
       <header className="bt-head">
         <div className="bt-date">
-          <b>{String(date.getMonth() + 1).padStart(2, '0')}.{String(date.getDate()).padStart(2, '0')}</b>
-          <span className="mono">{WEEK[date.getDay()]}</span>
+          <b>{multiDay ? (r.kind === 'month' ? `${date.getFullYear()}.${pad(date.getMonth() + 1)}` : md(day)) : md(day)}</b>
+          <span className="mono">{r.kind === 'week' ? `– ${md(lastDay)}` : r.kind === 'month' ? '' : WEEK[date.getDay()]}</span>
         </div>
-        <span className="bt-kind mono">{session ? `本次回顾 · ${clock(r.from)}–${clock(lastEnd ?? r.to)}` : '今日回顾 · 全天'}</span>
+        <span className="bt-kind mono">
+          {session ? `本次回顾 · ${clock(r.from)}–${clock(lastEnd ?? r.to)}` : r.kind === 'week' ? '周报' : r.kind === 'month' ? '月报' : '今日回顾 · 全天'}
+        </span>
       </header>
 
       <div className={`bt-grid ${photos.length ? 'with-photos' : ''}`}>
@@ -54,9 +64,9 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
         )}
 
         <div className="bt-tile bt-total">
-          <span className="bt-label">{session ? '这次玩了' : '今天玩了'}</span>
+          <span className="bt-label">{periodWord(r.kind)}玩了</span>
           <b>{hm(r.total_minutes)}</b>
-          <span className="bt-sub">{lastEnd ? `${clock(lastEnd)} 下线` : ''}</span>
+          <span className="bt-sub">{multiDay ? `${r.play_days} 天上线` : lastEnd ? `${clock(lastEnd)} 下线` : ''}</span>
         </div>
 
         <div className="bt-tile bt-nums">
@@ -67,18 +77,18 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
         </div>
 
         <div className="bt-tile bt-ribbon">
-          <span className="bt-label">什么时候在线</span>
-          <DayRibbon stops={r.timeline ?? []} day={day} longest={top?.world_id} />
+          <span className="bt-label">{multiDay ? '每天玩了多久' : '什么时候在线'}</span>
+          {multiDay ? <DailyBars r={r} /> : <DayRibbon stops={r.timeline ?? []} day={day} longest={top?.world_id} />}
         </div>
 
         <div className="bt-tile bt-stops">
-          <span className="bt-label">行程</span>
+          <span className="bt-label">{multiDay ? '最常去' : '行程'}</span>
           <ol>
             {stops.map((s, i) => (
               <li key={i}>
                 <Cover id={s.world_id} url={s.thumbnail} className="bt-thumb" />
                 <span className="bt-sname">{s.name}</span>
-                <span className="bt-stime mono">{clock(s.start)}</span>
+                <span className="bt-stime mono">{multiDay ? s.start : clock(s.start)}</span>
                 <span className="bt-sdur mono">{hm(s.minutes)}</span>
               </li>
             ))}
@@ -114,6 +124,35 @@ export function BentoCard({ r, priv }: { r: Recap; priv: Privacy }) {
       </div>
 
       <footer className="bt-foot"><Brand /></footer>
+    </div>
+  )
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const md = (d: string) => `${d.slice(5, 7)}.${d.slice(8, 10)}`
+
+/** 周报 / 月报：每天玩了多久（单色柱，最多的一天用强调色） */
+function DailyBars({ r }: { r: Recap }) {
+  const start = new Date(r.from.slice(0, 10) + 'T00:00:00')
+  const end = new Date(r.to.slice(0, 10) + 'T00:00:00')
+  const byDate = new Map(r.daily_minutes.map((d) => [d.date, d.minutes]))
+  const days: { date: string; minutes: number }[] = []
+  for (let t = start.getTime(); t < end.getTime(); t += 86400000) {
+    const d = new Date(t)
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    days.push({ date: key, minutes: byDate.get(key) ?? 0 })
+  }
+  const max = Math.max(1, ...days.map((d) => d.minutes))
+  const best = days.reduce((a, b) => (b.minutes > a.minutes ? b : a), days[0])
+  const week = days.length <= 7
+  return (
+    <div className="bt-bars">
+      {days.map((d, i) => (
+        <div key={d.date} className="bt-bar-col" title={`${d.date} ${hm(d.minutes)}`}>
+          <div className="bt-bar-track"><i className={d === best && d.minutes > 0 ? 'hl' : ''} style={{ height: `${(d.minutes / max) * 100}%` }} /></div>
+          <span className="mono">{week ? '一二三四五六日'[i] : (i + 1) % 5 === 0 || i === 0 ? i + 1 : ''}</span>
+        </div>
+      ))}
     </div>
   )
 }

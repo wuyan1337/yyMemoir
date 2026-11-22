@@ -387,3 +387,36 @@ pub fn recap_session(store: &Store, tz: TimeConv, session_id: i64, top_n: usize)
         None => Ok(None),
     }
 }
+
+/// 报告时间段：day / week（周一开始）/ month / year / all，返回 [开始, 结束) 的本地日期
+pub fn period_bounds(kind: &str, date: chrono::NaiveDate) -> (chrono::NaiveDate, chrono::NaiveDate) {
+    use chrono::{Duration, NaiveDate};
+    match kind {
+        "day" => (date, date + Duration::days(1)),
+        "week" => {
+            let s = date - Duration::days(date.weekday().num_days_from_monday() as i64);
+            (s, s + Duration::days(7))
+        }
+        "month" => {
+            let s = date.with_day(1).unwrap();
+            let e = if s.month() == 12 {
+                NaiveDate::from_ymd_opt(s.year() + 1, 1, 1).unwrap()
+            } else {
+                NaiveDate::from_ymd_opt(s.year(), s.month() + 1, 1).unwrap()
+            };
+            (s, e)
+        }
+        "year" => (
+            NaiveDate::from_ymd_opt(date.year(), 1, 1).unwrap(),
+            NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap(),
+        ),
+        _ => (NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), NaiveDate::from_ymd_opt(2100, 1, 1).unwrap()),
+    }
+}
+
+/// 按时间段出报告（app 的日 / 周 / 月 / 年报用）
+pub fn recap_period(store: &Store, tz: TimeConv, kind: &str, date: chrono::NaiveDate, top_n: usize) -> Result<Recap> {
+    let (a, b) = period_bounds(kind, date);
+    let ms = |d: chrono::NaiveDate| tz.to_utc_ms(d.and_hms_opt(0, 0, 0).unwrap());
+    recap(store, tz, kind, ms(a), ms(b), top_n)
+}

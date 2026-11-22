@@ -1,17 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import type { AppStatus } from '../lib/data'
 
-/** 后台检测到 VRChat 日志设成了「仅错误」时，在 app 顶部提醒用户去改。
- *  数据来自 `yymemoir-cli status`（以后换成 Tauri 命令）。 */
-export interface AppStatus { errors_only_logs: number; latest_errors_only: boolean }
-
-export function useStatus() {
-  const [st, setSt] = useState<AppStatus | null>(null)
-  useEffect(() => {
-    fetch('/real/status.json').then((r) => (r.ok ? r.json() : null)).catch(() => null).then(setSt)
-  }, [])
-  return st
-}
-
+/** 后台检测到 VRChat 日志设成了「仅错误」时，在 app 顶部提醒用户去改。 */
 export function LoggingAlert({ status }: { status: AppStatus | null }) {
   const [hidden, setHidden] = useState(false)
   if (!status || hidden || !status.latest_errors_only) return null

@@ -9,6 +9,10 @@ import { Brand, Cover } from './parts'
  * 当天拍了照才出现照片条；底部是一起最久的人。整张卡的色调从封面里取。
  */
 
+/** 时间段的口语说法：这次 / 今天 / 这周 / 这个月 / 今年 */
+export const periodWord = (kind: string) =>
+  ({ session: '这次', day: '今天', week: '这周', month: '这个月', year: '今年' } as Record<string, string>)[kind] ?? '至今'
+
 export const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 export const hm = (m: number) => {
   const h = Math.floor(m / 60), r = m % 60
@@ -39,11 +43,12 @@ export function Line({ r, priv }: { r: Recap; priv: Privacy }) {
   const top = r.top_worlds[0]
   const p = r.top_people[0]
   const last = r.last_logoff
-  const lateNight = last && last.slice(0, 10) > r.from.slice(0, 10)
+  // 只有日报 / 本次回顾才说「第二天几点才说晚安」
+  const lateNight = (r.kind === 'day' || r.kind === 'session') && last && last.slice(0, 10) > r.from.slice(0, 10)
   const name = p ? shown(p, priv).name : null
   return (
     <p className="dc-line">
-      {top && <>{r.kind === 'session' ? '这次' : '今天'}在<b>「{top.name}」</b>待得最久，</>}
+      {top && <>{periodWord(r.kind)}在<b>「{top.name}」</b>待得最久，</>}
       {name ? <>和 <b>{name}</b> 一起度过了 <em>{cn(p!.minutes)}</em>。</> : <>一个人也逛得很开心。</>}
       {lateNight && <>第二天 <em>{last!.slice(11, 16)}</em> 才说晚安。</>}
     </p>

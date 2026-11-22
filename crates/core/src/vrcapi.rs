@@ -24,9 +24,12 @@ pub fn fetch_missing_worlds(store: &Store, cache_dir: &Path, limit: usize) -> ru
     let ids: Vec<String> = {
         let mut st = store.conn.prepare(
             "SELECT v.world_id FROM visits v LEFT JOIN worlds_cache w ON w.world_id = v.world_id
-             WHERE w.thumbnail_path IS NULL GROUP BY v.world_id ORDER BY MAX(v.join_at) DESC LIMIT ?1",
+             WHERE w.thumbnail_path IS NULL AND (w.fetched_at IS NULL OR w.fetched_at < ?2)
+             GROUP BY v.world_id ORDER BY MAX(v.join_at) DESC LIMIT ?1",
         )?;
-        let rows = st.query_map([limit as i64], |r| r.get(0))?;
+        // 失败过的（删掉 / 私有的世界）一天内不再重试
+        let retry_before = chrono::Utc::now().timestamp_millis() - 24 * 3600 * 1000;
+        let rows = st.query_map(rusqlite::params![limit as i64, retry_before], |r| r.get(0))?;
         rows.collect::<rusqlite::Result<_>>()?
     };
     let agent = agent()?;
@@ -45,7 +48,14 @@ pub fn fetch_missing_worlds(store: &Store, cache_dir: &Path, limit: usize) -> ru
                 )?;
                 rep.fetched += 1;
             }
-            Err(e) => rep.failed.push(format!("{id}: {e}")),
+            Err(e) => {
+                store.conn.execute(
+                    "INSERT INTO worlds_cache(world_id, fetched_at) VALUES (?1, ?2)
+                     ON CONFLICT(world_id) DO UPDATE SET fetched_at = excluded.fetched_at",
+                    params![id, chrono::Utc::now().timestamp_millis()],
+                )?;
+                rep.failed.push(format!("{id}: {e}"));
+            }
         }
     }
     Ok(rep)

@@ -25,17 +25,19 @@ const TABS: { id: Tab; label: string }[] = [
 function useFitScale(ref: React.RefObject<HTMLElement | null>, w: number, h: number) {
   const [s, setS] = useState(0.3)
   useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const stage = (el.closest('.stage') as HTMLElement | null) ?? document.body
+    // 可用高度 = 内容区底边 - 卡片顶边 - 下边距(16) - 按钮条(约 56)；内容区大小变了（比如提醒条出现）就重算
     const fit = () => {
-      const el = ref.current
-      if (!el) return
-      const availH = window.innerHeight - el.getBoundingClientRect().top - 70
+      const availH = stage.getBoundingClientRect().bottom - el.getBoundingClientRect().top - 16 - 56
       setS(Math.max(0.15, Math.min(el.clientWidth / w, availH / h, 1)))
     }
     fit()
     const ro = new ResizeObserver(fit)
-    if (ref.current) ro.observe(ref.current)
-    window.addEventListener('resize', fit)
-    return () => { ro.disconnect(); window.removeEventListener('resize', fit) }
+    ro.observe(el)
+    ro.observe(stage)
+    return () => ro.disconnect()
   }, [ref, w, h])
   return s
 }
@@ -176,6 +178,8 @@ export function Shell() {
     appStatus().then(setStatus)
     const offs: Promise<() => void>[] = [
       onAppEvent('session-ended', () => refresh()),
+      // 后台新取到了世界封面等
+      onAppEvent('data-updated', () => refresh()),
       onAppEvent('open-session', (id) => { refresh(); setTab('session'); if (id != null) setOpenId(id) }),
     ]
     return () => { offs.forEach((p) => p.then((off) => off())) }

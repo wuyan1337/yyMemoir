@@ -15,18 +15,20 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); min-height: 100vh; }
+html, body, #root { height: 100%; }
+/* 整个窗口固定一屏，不让 WebView2 出现上下拖动再弹回；内容区自己滚动 */
+body { margin: 0; background: var(--bg); overflow: hidden; overscroll-behavior: none; }
 button { font: inherit; }
 
 /* ---------- 外壳 ---------- */
-.app { display: flex; flex-direction: column; min-height: 100vh; }
+.app { display: flex; flex-direction: column; height: 100%; }
 .topbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #ffffff14; }
 .logo { font-weight: 800; letter-spacing: .02em; }
 .tabs { display: flex; gap: 4px; background: #ffffff0d; padding: 4px; border-radius: 10px; }
 .tabs button { border: 0; background: transparent; color: var(--ink-2); padding: 6px 14px; border-radius: 7px; cursor: pointer; }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); }
 .privacy { display: flex; gap: 14px; margin-left: auto; color: var(--ink-2); font-size: 14px; }
-.stage { flex: 1; display: flex; justify-content: center; padding: 16px; }
+.stage { flex: 1; min-height: 0; display: flex; justify-content: center; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
 .player { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .player-stage { position: relative; }
 .player-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; color: var(--ink-2); font-size: 14px; }

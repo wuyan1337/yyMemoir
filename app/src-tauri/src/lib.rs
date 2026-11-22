@@ -1,6 +1,7 @@
 //! yyMemoir 桌面端：开机静默启动，只有托盘图标；后台监听 VRChat，下线推送「本次回顾」。
 //! 窗口只在点通知 / 托盘 / 再次打开程序时出现，关窗口只是隐藏。
 
+mod log;
 mod notify;
 mod paths;
 mod watcher;
@@ -9,7 +10,7 @@ use paths::Paths;
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, State, WindowEvent};
+use tauri::{Emitter, LogicalSize, Manager, State, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use yymemoir_core::{list_sessions, recap_period, recap_session, Recap, Store, TimeConv};
 
@@ -65,6 +66,29 @@ fn sessions(st: State<AppState>, limit: Option<usize>) -> Result<Vec<SessionItem
         .collect())
 }
 
+/// 读本地图片（世界封面 / 截图），缩到最长边 `max` 像素，返回 JPEG data URL。
+/// 不走 asset 协议：同源的 data URL 才能被 canvas 取色、被「保存图片」完整导出。
+/// 只允许读封面缓存和截图文件夹里的文件。
+#[tauri::command]
+fn image_data(st: State<AppState>, path: String, max: Option<u32>) -> Result<String, String> {
+    use base64::Engine;
+    let p = std::path::Path::new(&path).canonicalize().map_err(|e| e.to_string())?;
+    let allowed = [Some(st.paths.world_cache.clone()), st.paths.screenshots.clone()]
+        .into_iter()
+        .flatten()
+        .filter_map(|d| d.canonicalize().ok())
+        .any(|d| p.starts_with(d));
+    if !allowed {
+        return Err("不允许读取这个位置的文件".into());
+    }
+    let img = image::open(&p).map_err(|e| e.to_string())?;
+    let m = max.unwrap_or(1200);
+    let img = if img.width() > m || img.height() > m { img.thumbnail(m, m) } else { img };
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.to_rgb8().write_to(&mut buf, image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
+    Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buf.into_inner())))
+}
+
 #[derive(Serialize)]
 struct Status {
     errors_only_logs: usize,
@@ -87,15 +111,29 @@ fn status(st: State<AppState>) -> Result<Status, String> {
     })
 }
 
+/// 按屏幕大小定窗口：高度占屏幕 86%，宽度刚好放下侧栏 + 一张竖版卡片（3:4）
+fn fit_window(app: &tauri::AppHandle) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let Ok(Some(m)) = w.current_monitor() else { return };
+    let screen = m.size().to_logical::<f64>(m.scale_factor());
+    let h = (screen.height * 0.86).clamp(600.0, 1100.0);
+    // 卡片高 ≈ 窗口高 - 顶栏 / 按钮条（约 150），宽 = 高 × 3/4；再加左侧列表和边距（约 300）
+    let wd = ((h - 150.0) * 0.75 + 300.0).clamp(720.0, screen.width * 0.95);
+    w.set_size(LogicalSize::new(wd, h)).ok();
+    w.center().ok();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| notify::show_window(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![BACKGROUND_ARG])))
-        .invoke_handler(tauri::generate_handler![period_recap, session_recap, sessions, status])
+        .invoke_handler(tauri::generate_handler![period_recap, session_recap, sessions, status, image_data])
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let paths = Paths::detect(data_dir.clone());
+            log::init(data_dir.join("yymemoir.log"));
+            fit_window(app.handle());
 
             // 第一次运行默认开启开机自启（设置里可关）
             let marker = data_dir.join(".autostart-initialized");
@@ -127,8 +165,17 @@ pub fn run() {
 
             // 后台监听线程
             let handle = app.handle().clone();
+            let handle2 = app.handle().clone();
             let watcher_paths = paths.clone();
-            std::thread::spawn(move || watcher::run(watcher_paths, move |o| notify::push(&handle, o)));
+            std::thread::spawn(move || {
+                watcher::run(
+                    watcher_paths,
+                    move |o| notify::push(&handle, o),
+                    move || {
+                        handle2.emit("data-updated", ()).ok();
+                    },
+                )
+            });
 
             app.manage(AppState { paths });
 

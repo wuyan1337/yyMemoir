@@ -39,7 +39,7 @@ pub fn push(app: &AppHandle, o: Outcome) {
             })
             .show();
         if let Err(e) = res {
-            eprintln!("通知失败: {e}");
+            crate::log::log(format!("通知失败: {e}"));
         }
     }
     #[cfg(not(windows))]

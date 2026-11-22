@@ -1,6 +1,7 @@
 //! 后台监听：每 5 秒看一次 VRChat 是否在运行、增量读日志。
 //! 检测到 VRChat 关闭 → 收尾这次游玩 → 扫截图、取世界封面 → 生成「本次回顾」并推送通知。
 
+use crate::log::log;
 use crate::paths::Paths;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -45,7 +46,7 @@ pub fn sync(store: &mut Store, paths: &Paths, running: bool) {
     let files = log_files(&paths.vrchat_logs);
     for f in &files {
         if let Err(e) = ingest_file(store, f, TZ) {
-            eprintln!("读取 {} 失败: {e}", f.display());
+            log(format!("读取 {} 失败: {e}", f.display()));
         }
     }
     let unfinished: Vec<String> = store
@@ -81,7 +82,7 @@ pub fn on_game_exit(store: &mut Store, paths: &Paths) -> Option<Outcome> {
         return Some(Outcome::ErrorsOnly);
     }
     // 联网取世界名和封面（失败不影响推送）
-    yymemoir_core::vrcapi::fetch_missing_worlds(store, &paths.world_cache, 20).ok();
+    fetch_worlds(store, paths);
 
     let (id, _start, end) = *list_sessions(store, 1).ok()?.first()?;
     // 只推送刚结束的那次（10 分钟内），避免开机补扫时推送很久以前的
@@ -101,15 +102,35 @@ pub fn on_game_exit(store: &mut Store, paths: &Paths) -> Option<Outcome> {
     Some(Outcome::Session { id, title, body })
 }
 
-/// 监听主循环（在独立线程里跑）
-pub fn run(paths: Paths, notify: impl Fn(Outcome) + Send + 'static) {
+/// 给还没有封面的世界联网取名字和封面，返回新取到几个
+pub fn fetch_worlds(store: &Store, paths: &Paths) -> usize {
+    match yymemoir_core::vrcapi::fetch_missing_worlds(store, &paths.world_cache, 30) {
+        Ok(rep) => {
+            if rep.fetched > 0 || !rep.failed.is_empty() {
+                log(format!("世界封面：取到 {} 个，失败 {} 个", rep.fetched, rep.failed.len()));
+            }
+            for f in rep.failed.iter().take(5) {
+                log(format!("  失败 {f}"));
+            }
+            rep.fetched
+        }
+        Err(e) => {
+            log(format!("世界封面：出错 {e}"));
+            0
+        }
+    }
+}
+
+/// 监听主循环（在独立线程里跑）。`notify` 推送本次回顾；`updated` 通知窗口数据有更新（比如新取到了封面）
+pub fn run(paths: Paths, notify: impl Fn(Outcome) + Send + 'static, updated: impl Fn() + Send + 'static) {
     let mut store = match Store::open(&paths.db) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("打开数据库失败: {e}");
+            log(format!("打开数据库失败: {e}"));
             return;
         }
     };
+    log(format!("启动：日志目录 {}（{}）", paths.vrchat_logs.display(), if paths.vrchat_logs.is_dir() { "找到" } else { "没找到" }));
     let mut sys = System::new();
     let mut was_running = vrchat_running(&mut sys);
     // 开机补扫：游戏没在跑就把所有日志收尾
@@ -119,17 +140,33 @@ pub fn run(paths: Paths, notify: impl Fn(Outcome) + Send + 'static) {
             yymemoir_core::photos::scan_photos(&mut store, dir, TZ).ok();
         }
     }
+    // 补扫进来的历史游玩也要有封面
+    if fetch_worlds(&store, &paths) > 0 {
+        updated();
+    }
+    let mut last_fetch = std::time::Instant::now();
     loop {
         std::thread::sleep(Duration::from_secs(5));
         let running = vrchat_running(&mut sys);
         if was_running && !running {
             // 等游戏把最后几行写完
             std::thread::sleep(Duration::from_secs(3));
+            log("检测到 VRChat 关闭");
             if let Some(o) = on_game_exit(&mut store, &paths) {
                 notify(o);
             }
+            last_fetch = std::time::Instant::now();
         } else if running {
+            if !was_running {
+                log("检测到 VRChat 启动");
+            }
             sync(&mut store, &paths, true);
+        } else if last_fetch.elapsed() > Duration::from_secs(600) {
+            // 没在玩时每 10 分钟补一次缺的封面（之前没网 / 失败的）
+            last_fetch = std::time::Instant::now();
+            if fetch_worlds(&store, &paths) > 0 {
+                updated();
+            }
         }
         was_running = running;
     }

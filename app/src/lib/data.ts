@@ -17,18 +17,26 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   return invoke<T>(cmd, args)
 }
 
-/** 本地文件路径 → WebView 能加载的地址（封面、截图） */
+/** 本地图片 → data URL（Rust 读取并缩小）。同一张只读一次。 */
+const imgCache = new Map<string, Promise<string | null>>()
+function imageData(path: string | null, max: number): Promise<string | null> {
+  if (!path) return Promise.resolve(null)
+  const key = `${max}|${path}`
+  if (!imgCache.has(key)) imgCache.set(key, invoke<string>('image_data', { path, max }).catch(() => null))
+  return imgCache.get(key)!
+}
+
+/** 把报告里的本地路径（封面、截图）换成页面能直接显示、能导出的图片 */
 async function withUrls(r: Recap | null): Promise<Recap | null> {
   if (!r || !isTauri()) return r
-  const { convertFileSrc } = await import('@tauri-apps/api/core')
-  const u = (p: string | null) => (p ? convertFileSrc(p) : null)
-  return {
-    ...r,
-    top_worlds: r.top_worlds.map((w) => ({ ...w, thumbnail: u(w.thumbnail) })),
-    top_photo_world: r.top_photo_world ? { ...r.top_photo_world, thumbnail: u(r.top_photo_world.thumbnail) } : null,
-    timeline: r.timeline?.map((s) => ({ ...s, thumbnail: u(s.thumbnail) })),
-    photos: r.photos.map((p) => ({ ...p, url: u(p.path) })),
-  }
+  const cover = (p: string | null) => imageData(p, 1200)
+  const [worlds, topPhoto, timeline, photos] = await Promise.all([
+    Promise.all(r.top_worlds.map(async (w) => ({ ...w, thumbnail: await cover(w.thumbnail) }))),
+    r.top_photo_world ? cover(r.top_photo_world.thumbnail).then((t) => ({ ...r.top_photo_world!, thumbnail: t })) : Promise.resolve(null),
+    r.timeline ? Promise.all(r.timeline.map(async (s) => ({ ...s, thumbnail: await imageData(s.thumbnail, 400) }))) : Promise.resolve(undefined),
+    Promise.all(r.photos.map(async (p, i) => ({ ...p, url: i < 9 ? await imageData(p.path, 800) : null }))),
+  ])
+  return { ...r, top_worlds: worlds, top_photo_world: topPhoto, timeline, photos }
 }
 
 const DEMO_DAY = dayJson as Recap
@@ -55,7 +63,7 @@ export async function appStatus(): Promise<AppStatus | null> {
 }
 
 /** 桌面端事件：下线后有新回顾 / 点通知要打开某次回顾 */
-export async function onAppEvent(name: 'session-ended' | 'open-session', cb: (id: number | null) => void) {
+export async function onAppEvent(name: 'session-ended' | 'open-session' | 'data-updated', cb: (id: number | null) => void) {
   if (!isTauri()) return () => {}
   const { listen } = await import('@tauri-apps/api/event')
   return listen<number | null>(name, (e) => cb(e.payload))

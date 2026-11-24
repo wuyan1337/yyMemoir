@@ -200,11 +200,19 @@ pub fn run() {
             log::init(data_dir.join("yymemoir.log"));
             fit_window(app.handle());
 
-            // 第一次运行默认开启开机自启（设置里可关）
-            let marker = data_dir.join(".autostart-initialized");
+            // 默认开启开机自启（设置里可关）。确认开成功了才记下「已处理」，失败下次启动再试。
+            // v2：旧版不管成功与否都记下了，可能一直没开上，所以换个标记重新处理一次
+            let marker = data_dir.join(".autostart-initialized-v2");
             if !marker.exists() {
-                app.autolaunch().enable().ok();
-                std::fs::write(&marker, b"1").ok();
+                let al = app.autolaunch();
+                match al.enable() {
+                    Ok(()) if al.is_enabled().unwrap_or(false) => {
+                        std::fs::write(&marker, b"1").ok();
+                        log::log("已开启开机启动");
+                    }
+                    Ok(()) => log::log("开启开机启动后检查仍是关闭状态，下次启动再试"),
+                    Err(e) => log::log(format!("开启开机启动失败（下次启动再试）：{e}")),
+                }
             }
 
             // 托盘

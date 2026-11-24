@@ -66,7 +66,10 @@ export const PAGES: StoryPage[] = [
     render: (r) => (
       <Page r={r} label="这一年">
         <h1 className="yp-h1">你在另一个世界<br />度过了 <em>{hours(r.total_minutes)}</em> 小时</h1>
-        <p className="yp-lede">相当于不眠不休地待了 {Math.round(r.total_minutes / 60 / 24)} 天。</p>
+        {r.total_minutes >= 24 * 60 && (
+          // 不到 24 小时不说「几天」；10 天以内保留一位小数（21 小时不会再显示成 1 天）
+          <p className="yp-lede">相当于不眠不休地待了 {r.total_minutes >= 10 * 24 * 60 ? Math.round(r.total_minutes / 1440) : (Math.floor(r.total_minutes / 144) / 10).toFixed(1)} 天。</p>
+        )}
         <div className="yp-grid yp-grid-2">
           <div className="yp-tile"><span className="yp-label mono">上线天数</span><b className="yp-num">{r.play_days}</b></div>
           <div className="yp-tile"><span className="yp-label mono">上线次数</span><b className="yp-num">{r.session_count}</b></div>
